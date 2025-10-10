@@ -39,3 +39,102 @@
 
 # debug information files
 *.dwo
+# -------------------------
+# Build artifacts
+# -------------------------
+/build*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Object & binary files
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+*.exe
+*.out
+*.app
+
+# -------------------------
+# Simulation data / outputs
+# -------------------------
+*.dat
+*.bin
+*.vtk
+*.vtu
+*.pvtu
+*.h5
+*.hdf5
+*.xdmf
+*.log
+*.err
+*.out
+*.tmp
+*.chk        # checkpoints
+*.restart
+/data/
+output*/
+results*/
+
+# -------------------------
+# Editor/IDE files
+# -------------------------
+
+# Emacs
+*~
+\#*\#
+.\#*
+*.elc
+auto-save-list
+tramp
+
+# VSCode
+.vscode/
+.history/
+*.code-workspace
+
+# Vim
+*.swp
+*.swo
+
+# CLion / JetBrains IDEs
+.idea/
+
+# -------------------------
+# OS-generated junk
+# -------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+
+# -------------------------
+# Images / figures
+# -------------------------
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.tiff
+*.bmp
+*.svg
+*.eps
+*.pdf
+
+# -------------------------
+# Misc
+# -------------------------
+*.tar
+*.gz
+*.zip
+*.7z
+*.bak
+*.backup
+*.old
