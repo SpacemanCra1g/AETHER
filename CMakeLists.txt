@@ -11,6 +11,10 @@ option(ENABLE_OPENMP "Enable OpenMP parallelism" ON)
 option(ENABLE_MPI    "Enable MPI support"        OFF)
 option(ENABLE_CUDA   "Enable CUDA support"       OFF)
 option(ENABLE_SANITIZERS "Enable ASan/UBSan in Debug builds" ON)
+option(AETHER_BOUNDS_CHECK "Enable runtime bounds checking" OFF)
+
+
+
 
 # Compile-time knobs
 set(AETHER_DIM "3" CACHE STRING "Spatial dimension: 1, 2, or 3")
@@ -43,6 +47,7 @@ endif()
 set(AETHER_ENABLE_OPENMP ${ENABLE_OPENMP})
 set(AETHER_ENABLE_MPI    ${ENABLE_MPI})
 set(AETHER_ENABLE_CUDA   ${ENABLE_CUDA})
+set(AETHER_BOUNDS_CHECK  ${AETHER_BOUNDS_CHECK}$)
 
 # Expose project version to the template
 set(AETHER_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
@@ -107,8 +112,8 @@ if(ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT MSVC)
 endif()
 
 # ---- Main executable ---------------------------------------------------------
-add_executable(aether ${CMAKE_SOURCE_DIR}/src/main.cpp)
-target_link_libraries(aether PRIVATE aether_core)
+add_executable(aether.ex ${CMAKE_SOURCE_DIR}/src/main.cpp)
+target_link_libraries(aether.ex PRIVATE aether_core)
 
 # ---- Tests (optional, later) -------------------------------------------------
 option(AETHER_ENABLE_TESTS "Enable tests" OFF)

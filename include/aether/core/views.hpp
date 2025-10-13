@@ -1,6 +1,5 @@
 #pragma once 
 #include <array>
-#include <iterator>
 #include <vector>
 #include <cstddef>
 #include <cassert>
@@ -9,6 +8,9 @@
 
 
 namespace aether::core {
+
+// template<int DIM> struct IndexAdaptor; // Wrapper that converts index
+
 
 // ---------- Start with a generic Cell View structure ----------
 // ---------- Template on the number of components (compile time known, physics & dim) ----------
@@ -121,7 +123,7 @@ std::size_t sy{0}, sz{0};
 
 FaceGridZ() = default; 
 explicit FaceGridZ(const Extents &e){
-    Nx = e.Nx; Ny = e.Ny+1; NzF = e.Nz;
+    Nx = e.Nx; Ny = e.Ny; NzF = e.Nz+1;
     sy = std::size_t(Nx); sz = std::size_t(Nx)*Ny;
 }
 
@@ -181,7 +183,7 @@ struct FaceArrayViewT {
 // ---------- Owner and Container of Flux's ----------
 template <int NCOMP>
 struct FaceArraySoAT{
-    std::array<std::vector<double*>, NCOMP> comp;
+    std::array<std::vector<double>, NCOMP> comp;
     std::size_t nfaces{0};
     int Q{1};
 
@@ -219,5 +221,3 @@ AETHER_INLINE int face_index(FaceGridY& gy, int i, int jF, int k) {return int(gy
 AETHER_INLINE int face_index(FaceGridZ& gz, int i, int j, int kF) {return int(gz.index(i, j, kF));}
 
 }
-
-
