@@ -2,14 +2,12 @@ Build skeleton tree (source/headers, minimal CMake).
 
 Implement: SoA + views + strides (+ ghost indexing).
 
+Add HLLC; add RK2/3; add CFL estimator; add periodic/outflow BCs.
+
 Implement: PLM + HLLE; X-sweep only → validate on 1D Sod.
 
 Add Y/Z sweeps via direction policy → validate 2D blast.
 
-Add HLLC; add RK2/3; add CFL estimator; add periodic/outflow BCs.
-
 Add registry + runtime config; cache handles per stage/direction.
-
-Add basic IO + regression tests.
 
 Performance pass: OpenMP, alignment, avoid branching in hot loop.
