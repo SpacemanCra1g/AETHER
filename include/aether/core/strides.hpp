@@ -14,6 +14,7 @@ namespace aether::core {
         std::size_t sx=1, sy=0, sz=0;     // Stide lengths for each axis (continuous in i)
         int ng = 0;                       // Number of ghost cells
         int Ny =1, Nz = 1;
+        int ny = 0, nz = 0;
     
         //---------- Constructors ----------
         explicit ExtentsD() = default; 
@@ -51,6 +52,7 @@ namespace aether::core {
         int Nx = 0, Ny = 0, Nz = 0;     // Full domain sizes (Padded with ghost cells)
         std::size_t sx=1, sy=0, sz=0;   // Stide lengths for each axis (continuous in i)
         int ng = 0;                     // Number of ghost cells
+        int nz = 0;
     
         //---------- Constructors ----------
         
@@ -60,6 +62,7 @@ namespace aether::core {
             Ny = ny + 2*ng;
             Nz = 1;
             sx = 1;
+            nz = 0;
             sy = static_cast<std::size_t>(Nx);      // Stride in Y
             sz = static_cast<std::size_t>(Ny) * Nx; // Stride immediately exceeds the domain
         }

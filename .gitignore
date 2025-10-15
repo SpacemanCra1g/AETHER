@@ -48,6 +48,8 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 compile_commands.json
+generated/
+.cache/
 
 # Object & binary files
 *.o

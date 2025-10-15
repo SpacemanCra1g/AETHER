@@ -11,6 +11,8 @@
 
 // Spatial dimension
 #define AETHER_DIM @AETHER_DIM@
+#define AETHER_PHYSICS_STR "@AETHER_PHYSICS@"
+#define AETHER_PHYSICS_KIND @AETHER_PHYSICS_KIND@  // 1=Euler, 2=SRHD, 3=MHD
 
 // Physics selection (exactly one will be 1)
 #cmakedefine AETHER_PHYSICS_EULER @AETHER_PHYSICS_EULER@
