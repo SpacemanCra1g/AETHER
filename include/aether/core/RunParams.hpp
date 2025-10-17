@@ -1,5 +1,6 @@
 #pragma once
 #include <aether/core/enums.hpp>
+#include <string>
 
 namespace aether::core {
     struct config{
@@ -17,5 +18,6 @@ namespace aether::core {
         time_stepper time_step = time_stepper::char_trace;
         bool write_text{false}, write_ascii{false}, write_hdf5{false};
         bool use_defaults;
+        std::string output_dir;
     };
 }

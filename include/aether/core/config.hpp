@@ -3,8 +3,8 @@
 
 #pragma once
 
-#if __has_include(<aether/config_build.hpp>)
-  #include <aether/config_build.hpp>       
+#if __has_include(<aether/core/config_build.hpp>)
+  #include <aether/core/config_build.hpp>       
 #endif
 
 // ---------- Compiler/Platform feature probes ----------
