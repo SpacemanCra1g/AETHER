@@ -5,10 +5,12 @@
 int main(){
   using namespace aether::core; {
 
-  config cfg; 
+  Config cfg; 
 
   load_run_parameters(cfg);
-  display_run_parameters(cfg);
+  // display_run_parameters(cfg);
+
+  
   
   }; // namespace aether::core
   return 0;

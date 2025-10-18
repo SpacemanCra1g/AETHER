@@ -3,7 +3,7 @@
 #include <string>
 
 namespace aether::core {
-    struct config{
+    struct Config{
         int x_count{0}, y_count{0}, z_count{0};
         double cfl{0.0}, t_end{0.0}, t_start{0.0};
         double x_start{0.0}, x_end{0.0};

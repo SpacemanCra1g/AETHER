@@ -26,7 +26,7 @@ static void strip_whitespace(std::string &s){
     s = std::move(new_line);
 }
 
-static bool load_domain_size(std::string &s, aether::core::config &cfg){
+static bool load_domain_size(std::string &s, aether::core::Config &cfg){
   switch (s.at(4)) {
   case 'x' : cfg.x_count = std::stoi(s.substr(11,s.length()-11)); return true;
 
@@ -39,11 +39,11 @@ static bool load_domain_size(std::string &s, aether::core::config &cfg){
   return true;
 
 
-  default:  std::cout << " The dimention is : " << AETHER_DIM << std::endl; return false;
+  default: return false;
   };
 }
 
-static bool load_domain_range(std::string &s, aether::core::config &cfg){
+static bool load_domain_range(std::string &s, aether::core::Config &cfg){
   switch (s.at(0)) {
   case 'x' : 
     cfg.x_start = std::stod(s.substr(27, s.find_last_of(':') - 27)); 
@@ -63,7 +63,7 @@ static bool load_domain_range(std::string &s, aether::core::config &cfg){
   };
 }
 
-static bool load_run_specification(std::string &s, aether::core::config &cfg){
+static bool load_run_specification(std::string &s, aether::core::Config &cfg){
   if (s.substr(0,10) == "cfl_number") {
     cfg.cfl = std::stod(s.substr(10, s.length() - 10)); 
     return true;
@@ -168,7 +168,7 @@ static bool load_run_specification(std::string &s, aether::core::config &cfg){
   }
 };
 
-static bool load_output_specification(std::string &s, aether::core::config &cfg){
+static bool load_output_specification(std::string &s, aether::core::Config &cfg){
   if (s.substr(0,10) == "write_text"){
     std::string write_text = s.substr(10, s.length() - 10); 
     std::string write_text_lower;
@@ -214,7 +214,7 @@ static bool load_output_specification(std::string &s, aether::core::config &cfg)
 
 namespace aether::core {
 
-void display_run_parameters(config& cfg,std::ostream& os){
+void display_run_parameters(Config& cfg,std::ostream& os){
 
     constexpr bool kCUDA   = (AETHER_ENABLE_CUDA   == 1);
     constexpr bool kMPI    = (AETHER_ENABLE_MPI    == 1);
@@ -247,7 +247,7 @@ void display_run_parameters(config& cfg,std::ostream& os){
     os << "Snapshot every    : " << cfg.snap_shot_interval << " time steps";
 }
 
-void load_run_parameters(config& cfg){
+void load_run_parameters(Config& cfg){
     std::string line;
     std::ifstream in("./aether_config.cfg");
     assert(print_if_false(in,"Failed to open file"));
@@ -265,17 +265,17 @@ void load_run_parameters(config& cfg){
         if (line.empty()) continue;
 
         bool success = load_domain_size(line,cfg);
-        if (success) std::cout << "Domain size loaded!\n";
+        // if (success) std::cout << "Domain size loaded!\n";
 
         success = load_domain_range(line,cfg);
-        if (success) std::cout << "Domain boundaries loaded!\n";
+        // if (success) std::cout << "Domain boundaries loaded!\n";
 
         success = load_run_specification(line,cfg);
-        if (success) std::cout << "Run Specifications loaded!\n";
+        // if (success) std::cout << "Run Specifications loaded!\n";
 
         success = load_output_specification(line,cfg);
-        if (success) std::cout << "Output Specifications loaded!\n";
-
+        // if (success) std::cout << "Output Specifications loaded!\n";
+        (void)success;
     }
 }
 };

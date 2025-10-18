@@ -32,6 +32,8 @@ struct CellsViewT{
     AETHER_INLINE const double & var(int c, int i, int j = 0, int k = 0) const {return comp[c][idx(i,j,k)];}
 };
 
+
+
 // ---------- Continue with a generic Cell container structure ----------
 template<int NCOMP>
 struct CellsSoAT {
@@ -49,12 +51,12 @@ struct CellsSoAT {
     }
 
     // ---------- Returns the total flattened size of each variable array ----------
-    AETHER_INLINE std::size_t size_flat() const{
+    [[nodiscard]] AETHER_INLINE std::size_t size_flat() const{
         return std::size_t(ext.Nx) * ext.Ny * ext.Nz;
     }
 
     // ---------- Returns the CellsView template, used for cell access ----------
-    AETHER_INLINE struct CellsViewT<NCOMP> view() {
+    [[nodiscard]] AETHER_INLINE struct CellsViewT<NCOMP> view() noexcept{
         struct CellsViewT<NCOMP> v; 
         v.ext = ext; 
         for (int c = 0; c < NCOMP; ++c) v.comp[c] = comp[c].data();
@@ -154,6 +156,8 @@ AETHER_INLINE std::size_t nfaces() const{ return std::size_t(Nx)*Ny*NzF;}
 
 struct Quadrature {
 int Q{1}; // Default to 1 quadrature point.
+    Quadrature() = default;
+    Quadrature(int Q_) : Q(Q_){};
 };
 
 // ---------- Template for Flux Face views ----------
@@ -206,7 +210,7 @@ struct FaceArraySoAT{
         for (int c = 0; c < NCOMP; ++c) comp[c].resize(N);
     }
 
-    AETHER_INLINE FaceArrayViewT<NCOMP> view(){
+    [[nodiscard]] AETHER_INLINE FaceArrayViewT<NCOMP> view() noexcept{
         struct FaceArrayViewT<NCOMP> v; 
         v.Q = Q; v.nfaces = nfaces;
         for (int c = 0; c < NCOMP; ++c) v.comp[c] = comp[c].data();
