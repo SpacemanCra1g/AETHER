@@ -16,6 +16,7 @@ namespace aether::core {
         riemann riem = riemann::hll;
         solver solve = solver::fog;
         time_stepper time_step = time_stepper::char_trace;
+        boundary_conditions bc;
         bool write_text{false}, write_ascii{false}, write_hdf5{false};
         bool use_defaults;
         std::string output_dir;

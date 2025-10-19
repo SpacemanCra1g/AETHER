@@ -2,7 +2,6 @@
 #include <cstddef>
 #include <aether/core/config.hpp>
 #include <cassert>
-#include <stdexcept>
 
 namespace aether::core {
     enum class Dir {X = 0, Y = 1, Z = 2}; // Useful container for direction and dimension, prolly doesn't belong here, will move later

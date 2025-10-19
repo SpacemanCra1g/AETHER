@@ -47,12 +47,12 @@ std::string_view to_string(test_problem r){
     }
 }
 
-// inline constexpr std::string_view to_string(outputtype r){
-//     switch(r){
-//         case(outputtype::text) : return "outputing text-document";
-//         case(outputtype::ascii) : return "outputing ascii-file";
-//         case(outputtype::hdf5) : return "outputing hdf5-file";
-//         default: return "unknown";
-//     }
-// }
+std::string_view to_string(boundary_conditions r){
+    switch(r){
+        case(boundary_conditions::Outflow) : return "Outflow Boundary Conditions";
+        case(boundary_conditions::Periodic) : return "Periodic Boundary Conditions";
+        case(boundary_conditions::Reflecting) : return "Reflecting Boundary Conditions";
+        default: return "unknown";
+    }
+}
 }

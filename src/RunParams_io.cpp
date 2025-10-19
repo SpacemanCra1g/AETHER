@@ -1,3 +1,4 @@
+#include "aether/core/enums.hpp"
 #include <aether/core/RunParams.hpp>
 #include <aether/core/config_build.hpp>
 #include <aether/core/RunParams_io.hpp>
@@ -93,6 +94,26 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     }
     else {
       throw std::runtime_error("Unknown Riemann Solver selection " + riemann_solver_lower);
+      return false;
+    }
+  }
+  else if (s.substr(0,19) == "boundary_conditions"){
+    std::string BCs = s.substr(19, s.length() - 19); 
+    std::string BCs_lower;
+    for (std::size_t i = 0; i < BCs.length(); ++i){
+       BCs_lower += std::tolower(BCs[i]);
+    }
+    if (BCs_lower == "outflow"){
+       cfg.bc = aether::core::boundary_conditions::Outflow; return true;
+    }
+    else if (BCs_lower == "periodic"){
+       cfg.bc = aether::core::boundary_conditions::Periodic; return true;
+    }
+    else if (BCs_lower == "reflecting"){
+       cfg.bc = aether::core::boundary_conditions::Reflecting; return true;
+    }
+    else {
+      throw std::runtime_error("Unknown Boundary Condition selection " + BCs_lower);
       return false;
     }
   }

@@ -12,6 +12,6 @@ std::string_view to_string(time_stepper R);
 
 std::string_view to_string(test_problem R);
 
-// inline constexpr std::string_view to_string(aether::core::OutputType R);
+std::string_view to_string(boundary_conditions R);
 
 }
