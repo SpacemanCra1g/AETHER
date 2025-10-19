@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <aether/core/config.hpp>
 #include <cassert>
+#include <stdexcept>
 
 namespace aether::core {
     enum class Dir {X = 0, Y = 1, Z = 2}; // Useful container for direction and dimension, prolly doesn't belong here, will move later
@@ -18,6 +19,7 @@ namespace aether::core {
     
         //---------- Constructors ----------
         explicit ExtentsD() = default; 
+        
         explicit ExtentsD(int nx_, int ng_): nx(nx_), ng(ng_){
             Nx = nx + 2*ng;
             Ny = 1, Nz = 1;
@@ -25,6 +27,7 @@ namespace aether::core {
             sy = static_cast<std::size_t>(Nx);      // Stride immediately exceeds the domain. Useful for debugging
             sz = static_cast<std::size_t>(Ny) * Nx; // = Nx
         }
+        
         //---------- Tollerant of 2/3D Constructors ----------
         explicit ExtentsD(int nx_,[[maybe_unused]] int, int ng_): ExtentsD(nx_,ng_){}
         explicit ExtentsD(int nx_,[[maybe_unused]] int, [[maybe_unused]]int, int ng_): ExtentsD(nx_,ng_){}
