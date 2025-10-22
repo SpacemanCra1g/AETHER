@@ -74,6 +74,10 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     cfg.t_end = std::stod(s.substr( s.find_last_of(':')+1,s.length() - (s.find_last_of(':')+1))); 
     return true;
   }
+  else if (s.substr(0,5) == "gamma"){
+    cfg.gamma = std::stod(s.substr(5, s.length() - 5)); 
+    return true;
+  }
   else if (s.substr(0,14) == "riemann_solver"){
     std::string riemann_solver = s.substr(14, s.length() - 14); 
     std::string riemann_solver_lower;

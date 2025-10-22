@@ -4,7 +4,7 @@
 #include <aether/core/RunParams.hpp>           // config struct
 #include <aether/core/strides.hpp>             // Extents struct
 #include <aether/physics/counts.hpp>           // number of variables
-#include <aether/core/config_build.hpp>
+
 
 namespace aether::core{
 
@@ -26,7 +26,7 @@ namespace aether::core{
         struct Time{
             double dt{0.0}, t_start{0.0}, t_end{0.0};
             double t{0.0}, cfl{0.0};
-            int step{0};
+            int step{0}, RK_stage{0};
         };
         struct Grid{
             double dx{0.0}, dy{0.0}, dz{0.0};
@@ -35,6 +35,7 @@ namespace aether::core{
             double y_min{0.0}, y_max{0.0};
             double z_min{0.0}, z_max{0.0};
             int quad{0}, ng{0};
+            double gamma{0.0};
         };
         struct View{
             double dx, dt, cfl,t;
@@ -114,6 +115,7 @@ namespace aether::core{
             
             g.quad = config.num_quad;
             g.ng = config.num_ghost;
+            g.gamma = config.gamma;
             return g;
         }
 
@@ -125,6 +127,7 @@ namespace aether::core{
             t.t_end = config.t_end;
             t.cfl = config.cfl;
             t.step = 0;
+            t.RK_stage = 0;
             return t;
         }
 
@@ -145,7 +148,7 @@ namespace aether::core{
         struct Time{
             double dt{0.0}, t_start{0.0}, t_end{0.0};
             double t{0.0}, cfl{0.0};
-            int step{0};
+            int step{0}, RK_stage{0};
         };
         struct Grid{
             double dx{0.0}, dy{0.0}, dz{0.0};
@@ -154,6 +157,7 @@ namespace aether::core{
             double y_min{0.0}, y_max{0.0};
             double z_min{0.0}, z_max{0.0};
             int quad{0}, ng{0};
+            double gamma{0.0};
         };
         struct View{
             double dx, dy, dt, cfl, t;
@@ -246,6 +250,7 @@ namespace aether::core{
             
             g.quad = config.num_quad;
             g.ng = config.num_ghost;
+            g.gamma = config.gamma;
             return g;
         }
 
@@ -257,12 +262,14 @@ namespace aether::core{
             t.t_end = config.t_end;
             t.cfl = config.cfl;
             t.step = 0;
+            t.RK_stage = 0;
             return t;
         }
 
       
     };
 
+    // 3 Dimensional template for Simulation struct
     template <> 
     struct SimulationD<3>{
         // ---------- Set template names to be compile time standard ----------
@@ -276,7 +283,7 @@ namespace aether::core{
         struct Time{
             double dt{0.0}, t_start{0.0}, t_end{0.0};
             double t{0.0}, cfl{0.0};
-            int step{0};
+            int step{0}, RK_stage{0};
         };
         struct Grid{
             double dx{0.0}, dy{0.0}, dz{0.0};
@@ -285,6 +292,7 @@ namespace aether::core{
             double y_min{0.0}, y_max{0.0};
             double z_min{0.0}, z_max{0.0};
             int quad{0}, ng{0};
+            double gamma{0.0};
         };
         struct View{
             double dx, dy, dz, dt, cfl, t;
@@ -388,6 +396,7 @@ namespace aether::core{
             
             g.quad = config.num_quad;
             g.ng = config.num_ghost;
+            g.gamma = config.gamma;
             return g;
         }
 
@@ -399,6 +408,7 @@ namespace aether::core{
             t.t_end = config.t_end;
             t.cfl = config.cfl;
             t.step = 0;
+            t.RK_stage = 0;
             return t;
         }
     };

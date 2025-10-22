@@ -9,6 +9,7 @@ namespace aether::core {
         double x_start{0.0}, x_end{0.0};
         double y_start{0.0}, y_end{0.0};
         double z_start{0.0}, z_end{0.0};
+        double gamma{0.0};
         int snap_shot_interval{0};
         int num_ghost{0};
         int num_quad{0};

@@ -39,7 +39,7 @@ namespace aether::core {
         #endif
             return static_cast<std::size_t>(i+ng);
         }
-        AETHER_INLINE std::size_t index(int i, int j, int k) const{
+        AETHER_INLINE std::size_t index(int i, [[maybe_unused]] int j,[[maybe_unused]] int k) const{
         #if AETHER_BOUNDS_CHECK                     // Optional out of bounds access checking 
             assert(j == 0 && k == 0);
         #endif            
@@ -81,7 +81,7 @@ namespace aether::core {
             return static_cast<std::size_t>(ii) + static_cast<std::size_t>(jj)*sy;
         }
 
-        AETHER_INLINE std::size_t index(int i, int j, int k) const{
+        AETHER_INLINE std::size_t index(int i, int j, [[maybe_unused]]int k) const{
         #if AETHER_BOUNDS_CHECK                     // Optional out of bounds access checking 
             assert(k == 0);
         #endif

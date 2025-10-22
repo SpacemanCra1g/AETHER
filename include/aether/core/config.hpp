@@ -33,6 +33,15 @@
   #define AETHER_HD
 #endif
 
+// ---------- restricted pointer hints ----------
+#if AETHER_COMPILER_MSVC
+  #define AETHER_RESTRICT __restrict
+#elif AETHER_COMPILER_GCC || AETHER_COMPILER_CLANG
+  #define AETHER_RESTRICT __restrict__
+#else
+  #define AETHER_RESTRICT 
+#endif
+
 // ---------- Force-inline / always-inline hint ----------
 #if AETHER_COMPILER_MSVC
   #define AETHER_INLINE __forceinline
@@ -72,15 +81,6 @@
 #endif
 #ifndef AETHER_PHYSICS_SRHD
   #define AETHER_PHYSICS_SRHD 0
-#endif
-
-// ---------- Debug mode boundary checking ----------
-#ifndef AETHER_BOUNDS_CHECK
-  #if !defined (NDEBUG)
-    #define AETHER_BOUNDS_CHECK 1
-  #else 
-    #define AETHER_BOUNDS_CHECK 0
-  #endif
 #endif
 
 // ---------- Basic validation ----------

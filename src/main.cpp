@@ -1,6 +1,7 @@
-#include "aether/core/simulation.hpp"
+#include <aether/core/simulation.hpp>
 #include <aether/core/RunParams.hpp>
 #include <aether/core/RunParams_io.hpp>
+#include <aether/core/Initialize.hpp>
 
 
 int main(){
@@ -11,6 +12,7 @@ int main(){
 
   load_run_parameters(cfg);
   sim = Simulation(cfg);
+  initialize_domain(sim);
   // display_run_parameters(cfg);
 
   std::cout << "CFL = " << sim.time.cfl << "\n";
@@ -31,6 +33,8 @@ int main(){
   std::cout << "z_end = " << sim.grid.z_max << "\n";  
   std::cout << "dz = " << sim.grid.dz << "\n";  
   std::cout << "nz = " << sim.grid.nz << "\n";  
+
+  
   
   }; // namespace aether::core
   return 0;
