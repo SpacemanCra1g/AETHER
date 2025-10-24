@@ -1,7 +1,9 @@
+#include "aether/core/enums.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/RunParams.hpp>
 #include <aether/core/RunParams_io.hpp>
 #include <aether/core/Initialize.hpp>
+#include <aether/core/boundary_conditions.hpp>
 
 
 int main(){
@@ -13,6 +15,8 @@ int main(){
   load_run_parameters(cfg);
   sim = Simulation(cfg);
   initialize_domain(sim);
+  auto View = sim.view();
+  boundary_conditions(sim,View.prim);
   // display_run_parameters(cfg);
 
   std::cout << "CFL = " << sim.time.cfl << "\n";

@@ -2,7 +2,8 @@
 #include "aether/core/views.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/config.hpp>
+#include <aether/physics/counts.hpp>
 
 namespace aether::core {
-AETHER_INLINE void boundary_conditions(Simulation&,CellsViewT<AETHER_DIM>&);
+void boundary_conditions(Simulation&,CellsViewT<4>&);
 }
