@@ -15,10 +15,7 @@ namespace aether::core{
     template <> 
     struct SimulationD<1>{
         // ---------- Set template names to be compile time standard ----------
-        using CellsView = CellsViewT<aether::phys_ct::numvar>;
-        using CellsSoA = CellsSoAT<aether::phys_ct::numvar>;
-        using FaceArrayView = FaceArrayViewT<aether::phys_ct::numvar>;
-        using FaceArraySoA = FaceArraySoAT<aether::phys_ct::numvar>;
+
 
         // ---------- Sub-structs, containing Time, Grid config, -----------------
         // ---------- and a snapshot only 'view' object, passed by value ----------

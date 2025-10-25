@@ -5,6 +5,7 @@
 #include <cassert>
 #include <aether/core/config.hpp>
 #include <aether/core/strides.hpp>
+#include <aether/physics/counts.hpp>
 
 
 namespace aether::core {
@@ -224,4 +225,9 @@ AETHER_INLINE int face_index(FaceGridX& gx, int iF, int j, int k) {return int(gx
 AETHER_INLINE int face_index(FaceGridY& gy, int i, int jF, int k) {return int(gy.index(i, jF, k));}
 AETHER_INLINE int face_index(FaceGridZ& gz, int i, int j, int kF) {return int(gz.index(i, j, kF));}
 
+
+    using CellsView = CellsViewT<aether::phys_ct::numvar>;
+    using CellsSoA = CellsSoAT<aether::phys_ct::numvar>;
+    using FaceArrayView = FaceArrayViewT<aether::phys_ct::numvar>;
+    using FaceArraySoA = FaceArraySoAT<aether::phys_ct::numvar>;
 }

@@ -5,5 +5,5 @@
 #include <aether/physics/counts.hpp>
 
 namespace aether::core {
-void boundary_conditions(Simulation&,CellsViewT<4>&);
+void boundary_conditions(Simulation&,CellsView&);
 }
