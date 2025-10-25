@@ -27,7 +27,7 @@ static AETHER_INLINE int num_digits(int value){
 
 static AETHER_INLINE std::string make_snapshot_path(const std::string &dir,
                                       const std::string &prefix,
-                                      const int step, const std::string &ext = ".txt"){
+                                      const int step, const std::string &ext = ".dat"){
 
     namespace fs = std::filesystem;
         
@@ -162,7 +162,7 @@ static AETHER_INLINE void write_plaintext_snapshot(
     const std::string& prefix,
     bool include_ghosts){
 
-    const std::string path = make_snapshot_path(outdir, prefix, sim.time.step, ".txt");
+    const std::string path = make_snapshot_path(outdir, prefix, sim.time.step, ".dat");
 
     FILE* f = std::fopen(path.c_str(), "w");
     if (!f) { throw std::runtime_error("Failed to open " + path); }
