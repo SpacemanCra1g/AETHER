@@ -17,7 +17,7 @@ namespace aether::core {
 // ---------- Template on the number of components (compile time known, physics & dim) ----------
 template<int NCOMP> 
 struct CellsViewT{
-    std::array<double*, NCOMP> comp{};  // comp[NCOMP][Flat_index]
+    std::array<double* AETHER_RESTRICT, NCOMP> comp{};  // comp[NCOMP][Flat_index]
     Extents ext;                        // Extents struct defined in strides.hpp
 
     AETHER_INLINE std::size_t idx(int i, int j=0, int k=0) const {return ext.index(i,j,k);} // Contains the boundary checking built into Extents 
@@ -164,7 +164,7 @@ int Q{1}; // Default to 1 quadrature point.
 // ---------- Template for Flux Face views ----------
 template<int NCOMP>
 struct FaceArrayViewT {
-    std::array<double *, NCOMP> comp;
+    std::array<double * AETHER_RESTRICT, NCOMP> comp;
     std::size_t nfaces{0};
     int Q{1};
 

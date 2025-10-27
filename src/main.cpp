@@ -4,6 +4,7 @@
 #include <aether/core/Initialize.hpp>
 #include <aether/core/boundary_conditions.hpp>
 #include <aether/io/snapshot.hpp>
+#include <aether/physics/api.hpp>
 
 
 int main(){
@@ -18,28 +19,10 @@ int main(){
   initialize_domain(sim);
   auto View = sim.view();
   boundary_conditions(sim,View.prim);
+
+  std::cout << "Here is the physics name: " << aether::phys::name() << "\n";
   
-  // display_run_parameters(cfg);
-
-  // std::cout << "CFL = " << sim.time.cfl << "\n";
-  // std::cout << "time = " << sim.time.t << "\n";
-  // std::cout << "x_start = " << sim.grid.x_min << "\n";  
-  // std::cout << "x_end = " << sim.grid.x_max << "\n";  
-  // std::cout << "dx = " << sim.grid.dx << "\n";  
-  // std::cout << "nx = " << sim.grid.nx << "\n";  
-
-  // std::cout << "#####################\n y-Params\n";
-  // std::cout << "y_start = " << sim.grid.y_min << "\n";  
-  // std::cout << "y_end = " << sim.grid.y_max << "\n";  
-  // std::cout << "dy = " << sim.grid.dy << "\n";  
-  // std::cout << "ny = " << sim.grid.ny << "\n";  
-
-  // std::cout << "#####################\n z-Params\n";
-  // std::cout << "z_start = " << sim.grid.z_min << "\n";  
-  // std::cout << "z_end = " << sim.grid.z_max << "\n";  
-  // std::cout << "dz = " << sim.grid.dz << "\n";  
-  // std::cout << "nz = " << sim.grid.nz << "\n";  
-
+  
     namespace io = aether::io;
     io::snapshot_request snap;
     snap.formats.push_back(io::output_format::plain_txt);

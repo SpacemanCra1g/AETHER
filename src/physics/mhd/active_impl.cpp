@@ -1,7 +1,7 @@
-#include <aether/physics/api.hpp>
+#include <aether/physics/mhd/public.hpp>
 #include <aether/physics/counts.hpp>
 
-namespace aether::phys{
+namespace physics::mhd{
     namespace ct = aether::phys_ct;
     int nprim(){return ct::numvar;}
     int ncons(){return ct::numvar;}
