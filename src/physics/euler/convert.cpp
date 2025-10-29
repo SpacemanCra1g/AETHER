@@ -1,136 +1,69 @@
+#include "aether/core/simulation.hpp"
 #include <aether/physics/euler/convert.hpp>
 #include <aether/core/prim_layout.hpp>
 #include <aether/core/con_layout.hpp>
+#include <cstddef>
 
 using P = aether::prim::Prim;
 using C = aether::con::Cons;
 
 namespace aether::physics::euler {
-void cons_to_prims_domain(aether::core::Simulation::View &view, const double gamma){
-    // 1D version 
-#if AETHER_DIM == 1
-    const int Nx = view.nx + view.ng;
-    #pragma omp parallel for schedule(static) default(none) shared(view,gamma,Nx)
-    for (int i = -view.ng; i < Nx; ++i){
+void cons_to_prims_domain(aether::core::Simulation &sim){
+    const std::size_t N = sim.ext.flat();
+    auto view = sim.view(); 
+    const double gamma = sim.grid.gamma;
+
+    #pragma omp parallel for schedule(static) default(none) shared(view,N,gamma)
+    for (std::size_t i = 0; i < N; ++i){
         cons con; 
-        con.rho = view.cons.var(C::RHO,i,0,0); 
-        con.mx = view.cons.var(C::MX,i,0,0); 
-        con.E = view.cons.var(C::E,i,0,0); 
+        con.rho = view.cons.var(C::RHO,i); 
+        con.mx = view.cons.var(C::MX,i); 
+        con.my = (AETHER_DIM > 1) ? view.cons.var(C::MY,i) : 0.0; 
+        con.mz = (AETHER_DIM > 2) ? view.cons.var(C::MZ,i) : 0.0; 
+        con.E = view.cons.var(C::E,i); 
+
         auto prim = cons_to_prims_cell(con,gamma);
 
-        view.prim.var(P::RHO,i,0,0) = prim.rho;
-        view.prim.var(P::VX,i,0,0) = prim.vx;
-        view.prim.var(P::P,i,0,0) = prim.p;
-    }
+        view.prim.var(P::RHO,i) = prim.rho;
+        view.prim.var(P::VX,i) = prim.vx;
 
-#elif AETHER_DIM == 2
-    const int Nx = view.nx + view.ng;
-    const int Ny = view.ny + view.ng;
-    #pragma omp parallel for collapse(2) schedule(static) default(none) shared(view,gamma,Nx,Ny)
-    for (int j = -view.ng; j < Ny; ++j){
-        for (int i = -view.ng; i < Nx; ++i){
-            cons con; 
-            con.rho = view.cons.var(C::RHO,i,j,0); 
-            con.mx = view.cons.var(C::MX,i,j,0); 
-            con.my = view.cons.var(C::MY,i,j,0); 
-            con.E = view.cons.var(C::E,i,j,0); 
-            auto prim = cons_to_prims_cell(con,gamma);
-
-            view.prim.var(P::RHO,i,j,0) = prim.rho;
-            view.prim.var(P::VX,i,j,0) = prim.vx;
-            view.prim.var(P::VY,i,j,0) = prim.vy;
-            view.prim.var(P::P,i,j,0) = prim.p;
+        if constexpr (P::HAS_VY){
+            view.prim.var(P::VY,i) = prim.vy;
         }
-    }
-#elif AETHER_DIM == 3
-    const int Nx = view.nx + view.ng;
-    const int Ny = view.ny + view.ng;
-    const int Nz = view.nz + view.ng;
-    #pragma omp parallel for collapse(3) schedule(static) default(none) shared(view,gamma,Nx,Ny,Nz)
-    for (int k = -view.ng; k < Nz; ++k){
-        for (int j = -view.ng; j < Ny; ++j){
-            for (int i = -view.ng; i < Nx; ++i){
-                cons con; 
-                con.rho = view.cons.var(C::RHO,i,j,k); 
-                con.mx = view.cons.var(C::MX,i,j,k); 
-                con.my = view.cons.var(C::MY,i,j,k); 
-                con.mz = view.cons.var(C::MZ,i,j,k); 
-                con.E = view.cons.var(C::E,i,j,k); 
-                auto prim = cons_to_prims_cell(con,gamma);
-
-                view.prim.var(P::RHO,i,j,k) = prim.rho;
-                view.prim.var(P::VX,i,j,k) = prim.vx;
-                view.prim.var(P::VY,i,j,k) = prim.vy;
-                view.prim.var(P::VZ,i,j,k) = prim.vz;
-                view.prim.var(P::P,i,j,k) = prim.p;
-            }
+        if constexpr (P::HAS_VZ){
+        view.prim.var(P::VZ,i) = prim.vz;
         }
-    }   
-#endif
+
+        view.prim.var(P::P,i) = prim.p;
+    }
 
 }
 
-void prims_to_cons_domain(aether::core::Simulation::View &view, const double gamma){
-    // 1D version 
-#if AETHER_DIM == 1
-    const int Nx = view.nx + view.ng;
-    #pragma omp parallel for schedule(static) default(none) shared(view,gamma,Nx)
-    for (int i = -view.ng; i < Nx; ++i){
+void prims_to_cons_domain(aether::core::Simulation &sim){
+    const std::size_t N = sim.ext.flat();
+    auto view = sim.view(); 
+    const double gamma = sim.grid.gamma;
+
+    #pragma omp parallel for schedule(static) default(none) shared(view,N,gamma)
+    for (std::size_t i = 0; i < N; ++i){
         prims prim; 
-        prim.rho = view.prim.var(P::RHO,i,0,0); 
-        prim.vx = view.prim.var(P::VX,i,0,0); 
-        prim.p = view.prim.var(P::P,i,0,0); 
+        prim.rho = view.prim.var(P::RHO,i); 
+        prim.vx = view.prim.var(P::VX,i); 
+        prim.vy = (AETHER_DIM > 1) ? view.prim.var(P::VY,i) : 0.0; 
+        prim.vz = (AETHER_DIM > 2) ? view.prim.var(P::VZ,i) : 0.0; 
+        prim.p = view.prim.var(P::P,i); 
+
         auto con = prims_to_cons_cell(prim,gamma);
 
-        view.cons.var(C::RHO,i,0,0) = con.rho;
-        view.cons.var(C::MX,i,0,0) =  con.mx;
-        view.cons.var(C::E,i,0,0) =   con.E;
-    }
-
-#elif AETHER_DIM == 2
-    const int Nx = view.nx + view.ng;
-    const int Ny = view.ny + view.ng;
-    #pragma omp parallel for collapse(2) schedule(static) default(none) shared(view,gamma,Nx,Ny)
-    for (int j = -view.ng; j < Ny; ++j){
-        for (int i = -view.ng; i < Nx; ++i){
-            prims prim; 
-            prim.rho = view.prim.var(P::RHO,i,j,0); 
-            prim.vx = view.prim.var(P::VX,i,j,0); 
-            prim.vy = view.prim.var(P::VY,i,j,0); 
-            prim.p = view.prim.var(P::P,i,j,0); 
-            auto con = prims_to_cons_cell(prim,gamma);
-
-            view.cons.var(C::RHO,i,j,0) = con.rho;
-            view.cons.var(C::MX,i,j,0) =  con.mx;
-            view.cons.var(C::MY,i,j,0) =  con.my;
-            view.cons.var(C::E,i,j,0) =   con.E;
+        view.cons.var(C::RHO,i) = con.rho;
+        view.cons.var(C::MX,i) = con.mx;
+        if constexpr (C::HAS_MY){
+            view.cons.var(C::MY,i) = con.my;
         }
-    }
-#elif AETHER_DIM == 3
-    const int Nx = view.nx + view.ng;
-    const int Ny = view.ny + view.ng;
-    const int Nz = view.nz + view.ng;
-    #pragma omp parallel for collapse(3) schedule(static) default(none) shared(view,gamma,Nx,Ny,Nz)
-    for (int k = -view.ng; k < Nz; ++k){
-        for (int j = -view.ng; j < Ny; ++j){
-            for (int i = -view.ng; i < Nx; ++i){
-                prims prim; 
-                prim.rho = view.prim.var(P::RHO,i,j,k); 
-                prim.vx = view.prim.var(P::VX,i,j,k); 
-                prim.vy = view.prim.var(P::VY,i,j,k); 
-                prim.vz = view.prim.var(P::VZ,i,j,k); 
-                prim.p = view.prim.var(P::P,i,j,k); 
-                auto con = prims_to_cons_cell(prim,gamma);
-
-                view.cons.var(C::RHO,i,j,k) = con.rho;
-                view.cons.var(C::MX,i,j,k) =  con.mx;
-                view.cons.var(C::MY,i,j,k) =  con.my;
-                view.cons.var(C::MZ,i,j,k) =  con.mz;
-                view.cons.var(C::E,i,j,k) =   con.E;
-            }
+        if constexpr (C::HAS_MZ){
+        view.cons.var(C::MZ,i) = con.mz;
         }
-    }   
-#endif
-
+        view.cons.var(C::E,i) = con.E;
+    }
 }
 }

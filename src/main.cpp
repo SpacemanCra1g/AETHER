@@ -19,8 +19,8 @@ int main(){
   auto View = sim.view();
   boundary_conditions(sim,View.prim);
 
-  aether::phys::prims_to_cons_domain(View,sim.grid.gamma);
-  // aether::phys::cons_to_prims_domain(View,sim.grid.gamma);
+  aether::phys::prims_to_cons_domain(sim);
+  aether::phys::cons_to_prims_domain(sim);
 
   std::cout << "Here is the physics name: " << aether::phys::name() << "\n";
 
