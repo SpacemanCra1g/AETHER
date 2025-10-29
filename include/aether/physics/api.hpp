@@ -11,7 +11,7 @@
 
 namespace aether{
 #if AETHER_PHYSICS_EULER==1
-    namespace phys = physics::euler;
+    namespace phys = ::aether::physics::euler;
 
 #elif AETHER_PHYSICS_MHD==1
     namespace phys = physics::mhd;

@@ -22,8 +22,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # for clangd/VSCode
 # ---- User options  -----------------------------------------------------------
 option(ENABLE_OPENMP         "Enable OpenMP parallelism"                 OFF)
 option(ENABLE_MPI            "Enable MPI support"                        OFF)
-option(ENABLE_CUDA           "Enable CUDA support"                        OFF)
-option(ENABLE_SANITIZERS     "Enable ASan/UBSan in Debug builds"          ON)
+option(ENABLE_CUDA           "Enable CUDA support"                       OFF)
+option(ENABLE_SANITIZERS     "Enable ASan/UBSan in Debug builds"         ON)
 option(AETHER_BOUNDS_CHECK   "Enable runtime bounds checking"            OFF)
 
 # Compile-time knobs
@@ -41,6 +41,17 @@ if(ENABLE_CUDA)
 endif()
 
 # ---- Map options to 0/1 ints for headers ------------------------------------
+
+# ---- Default build type ------------------------------------------------------
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type selected, defaulting to Release")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
+
+  # Allow IDEs like VSCode/CMake Tools to still offer dropdown choices
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+               "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+endif()
+
 # Backend features
 set(AETHER_ENABLE_OPENMP_INT 0)
 if(ENABLE_OPENMP)
@@ -116,6 +127,45 @@ else()
   target_compile_options(aether_compile_options INTERFACE -Wall -Wextra -Wpedantic)
 endif()
 
+# ---- Sanitizers helper (list-based; INTERFACE-safe) --------------------------
+set(AETHER_SAN_LIST address undefined)  # list of sanitizers
+
+function(aether_enable_sanitizers_for TARGET_NAME)
+  if(NOT ENABLE_SANITIZERS OR MSVC)
+    return()
+  endif()
+  if(NOT CMAKE_BUILD_TYPE MATCHES "Debug|RelWithDebInfo")
+    return()
+  endif()
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|AppleClang")
+    return()
+  endif()
+
+  get_target_property(_type ${TARGET_NAME} TYPE)
+  if(NOT _type)
+    message(FATAL_ERROR "Target '${TARGET_NAME}' not found for sanitizer enabling.")
+  endif()
+
+  set(_compile_flags -fno-omit-frame-pointer)
+  set(_link_flags)
+  foreach(san IN LISTS AETHER_SAN_LIST)
+    list(APPEND _compile_flags "-fsanitize=${san}")
+    list(APPEND _link_flags    "-fsanitize=${san}")
+  endforeach()
+
+  if(_type STREQUAL "INTERFACE_LIBRARY")
+    target_compile_options(${TARGET_NAME} INTERFACE
+      $<$<COMPILE_LANGUAGE:CXX>:${_compile_flags}>
+    )
+    target_link_options(${TARGET_NAME} INTERFACE ${_link_flags})
+  else()
+    target_compile_options(${TARGET_NAME} PRIVATE
+      $<$<COMPILE_LANGUAGE:CXX>:${_compile_flags}>
+    )
+    target_link_options(${TARGET_NAME} PRIVATE ${_link_flags})
+  endif()
+endfunction()
+
 # ---- Core library target -----------------------------------------------------
 add_library(aether_core)
 
@@ -161,24 +211,19 @@ if(ENABLE_CUDA)
   target_sources(aether_core PRIVATE ${AETHER_CORE_CU})
 endif()
 
-# Sanitizers in Debug (Linux/Clang/GCC)
-if(ENABLE_SANITIZERS AND NOT MSVC)
-  target_compile_options(aether_core PRIVATE
-    $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
-  target_link_options(aether_core PRIVATE
-    $<$<CONFIG:Debug>:-fsanitize=address,undefined>)
-endif()
-
-# NOTE: AETHER_BOUNDS_CHECK is now emitted via generated header; no compile_def here.
-
 # ---- Physics libraries -------------------------------------------------------
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/physics)
 target_link_libraries(aether_core PUBLIC aether_phys)
 
-
 # ---- Main executable ---------------------------------------------------------
 add_executable(aether.ex ${CMAKE_SOURCE_DIR}/src/main.cpp)
 target_link_libraries(aether.ex PRIVATE aether_core aether_phys)
+
+# ---- Enable sanitizers on linkable targets ----------------------------------
+# (Key: the final link of aether.ex must carry -fsanitize=... )
+aether_enable_sanitizers_for(aether_core)
+aether_enable_sanitizers_for(aether_phys)  # INTERFACE-safe
+aether_enable_sanitizers_for(aether.ex)
 
 # ---- Tests (optional) --------------------------------------------------------
 option(AETHER_ENABLE_TESTS "Enable tests" OFF)

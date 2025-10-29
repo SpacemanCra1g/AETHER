@@ -130,7 +130,7 @@ namespace aether::core {
     using Extents = ExtentsD<AETHER_DIM>;
 
     // returns a pointer difference value for strides in different dimentions
-    AETHER_INLINE std::ptrdiff_t step(const ExtentsD<1> &e, Dir d){
+    AETHER_INLINE std::ptrdiff_t step(const ExtentsD<1> &e, [[maybe_unused]]Dir d){
         assert(d == Dir::X);
         return std::ptrdiff_t(e.sx);
     }

@@ -7,7 +7,7 @@
 #include <cassert>
 #include <fstream>
 
-static bool print_if_false (std::ifstream &assertion, std::string Message){
+[[maybe_unused]] static bool print_if_false (std::ifstream &assertion, std::string Message){
   if (!assertion) {std::cout << Message << std::endl; return false;}
   else return true;
 }

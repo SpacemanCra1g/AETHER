@@ -1,7 +1,8 @@
 #pragma once
 #include <string_view>
+#include <aether/physics/euler/convert.hpp>
 
-namespace physics::euler{
+namespace aether::physics::euler{
 
 int nprim();
 int ncons();

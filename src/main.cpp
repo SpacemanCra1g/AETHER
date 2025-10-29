@@ -6,7 +6,6 @@
 #include <aether/io/snapshot.hpp>
 #include <aether/physics/api.hpp>
 
-
 int main(){
   using namespace aether::core; {
 
@@ -20,7 +19,12 @@ int main(){
   auto View = sim.view();
   boundary_conditions(sim,View.prim);
 
+  aether::phys::prims_to_cons_domain(View,sim.grid.gamma);
+  // aether::phys::cons_to_prims_domain(View,sim.grid.gamma);
+
   std::cout << "Here is the physics name: " << aether::phys::name() << "\n";
+
+  
   
   
     namespace io = aether::io;

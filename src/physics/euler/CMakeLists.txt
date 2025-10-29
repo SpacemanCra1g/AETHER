@@ -1,6 +1,7 @@
 # Euler backend
 add_library(aether_phys_euler STATIC
   active_impl.cpp
+  convert.cpp
   # add more Euler-specific .cpp here
 )
 
