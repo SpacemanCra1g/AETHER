@@ -50,6 +50,7 @@ Makefile
 compile_commands.json
 generated/
 .cache/
+out/
 
 # Object & binary files
 *.o
