@@ -31,6 +31,13 @@ struct CellsViewT{
     AETHER_INLINE double & var(int c, int i, int j = 0, int k = 0) {return comp[c][idx(i,j,k)];}
     // ---------- Access overload for const instantiations of the Cell View ----------    
     AETHER_INLINE const double & var(int c, int i, int j = 0, int k = 0) const {return comp[c][idx(i,j,k)];}
+
+    // CellsViewT() = default; 
+    // CellsViewT(const CellsViewT&) = default; 
+    // CellsViewT(CellsViewT&&) = default; 
+    // CellsViewT& operator=(const CellsViewT&) = default;
+    // CellsViewT& operator=(CellsViewT&&) = default;
+    // ~CellsViewT() = default;
 };
 
 

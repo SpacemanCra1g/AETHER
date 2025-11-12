@@ -1,3 +1,4 @@
+#include "aether/physics/counts.hpp"
 #include "aether/physics/euler/time_controller.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/RunParams_io.hpp>
@@ -5,6 +6,7 @@
 #include <aether/core/boundary_conditions.hpp>
 #include <aether/io/snapshot.hpp>
 #include <aether/physics/api.hpp>
+#include <aether/core/time_stepper_containers.hpp>
 
 int main(){
   using namespace aether::core; {
@@ -14,11 +16,15 @@ int main(){
 
   load_run_parameters(cfg);
   sim = Simulation(cfg);
-
+  
   initialize_domain(sim);
+  // Initialize buffers
+  substage_container buffers;
+  buffers.init(sim);
+  
   auto View = sim.view();
   boundary_conditions(sim,View.prim);
-
+  
   aether::phys::prims_to_cons_domain(sim);
   // aether::phys::cons_to_prims_domain(sim);
 

@@ -74,6 +74,29 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     cfg.t_end = std::stod(s.substr( s.find_last_of(':')+1,s.length() - (s.find_last_of(':')+1))); 
     return true;
   }
+  else if (s.substr(0,12) == "time_stepper"){
+    std::string stepper = s.substr(12, s.length() - 12); 
+    std::string stepper_lower; 
+    for (std::size_t i = 0; i < stepper.length(); ++i){
+       stepper_lower += std::tolower(stepper[i]);
+    }
+    if (stepper_lower == "char_trace"){
+      cfg.time_step = aether::core::time_stepper::char_trace;
+    }
+    else if (stepper_lower == "rk1"){
+      cfg.time_step = aether::core::time_stepper::rk1;
+    }
+    else if (stepper_lower == "rk2"){
+      cfg.time_step = aether::core::time_stepper::rk2;
+    }
+    else if (stepper_lower == "rk3"){
+      cfg.time_step = aether::core::time_stepper::rk3;
+    }
+    else if (stepper_lower == "rk4"){
+      cfg.time_step = aether::core::time_stepper::rk4;
+    }
+    return true;
+  }
   else if (s.substr(0,5) == "gamma"){
     cfg.gamma = std::stod(s.substr(5, s.length() - 5)); 
     return true;
