@@ -4,6 +4,7 @@
 #include <aether/core/RunParams.hpp>           // config struct
 #include <aether/core/strides.hpp>             // Extents struct
 #include <aether/physics/counts.hpp>           // number of variables
+#include <aether/core/char_struct.hpp>
 
 
 namespace aether::core{
@@ -39,12 +40,14 @@ namespace aether::core{
             int nx, quad, ng;
             FaceArrayView x_flux_left;
             FaceArrayView x_flux_right;
-            CellsView prim, cons, chars;
+            CellsView prim, cons;
+            CharView chars;
+            eigenvec_view eigs;
         };
 
         // Compile time known numvar parameter 
         static constexpr int numvar = aether::phys_ct::numvar;
-
+        
         // Declaring sub-structs
         Config cfg;
         Time time;
@@ -52,7 +55,7 @@ namespace aether::core{
         // Declaring domain containers
         CellsSoA prims_container;
         CellsSoA cons_container;
-        CellsSoA chars_container;
+        CharSoA chars_container;
         // Flux and grid extents structs
         Extents ext;
         FaceGridX flux_x_ext;
@@ -62,6 +65,7 @@ namespace aether::core{
         // each is resized to account for quad points
         FaceArraySoA flux_left_x_container;
         FaceArraySoA flux_right_x_container;
+        eigenvectors char_eigs;
         
         SimulationD() = default;
 
@@ -77,6 +81,7 @@ namespace aether::core{
         , flux_x_ext(ext), quad(grid.quad)
         , flux_left_x_container(flux_x_ext, quad)
         , flux_right_x_container(flux_x_ext, quad)
+        , char_eigs(prims_container.size_flat())
         {}
         
 
@@ -90,6 +95,7 @@ namespace aether::core{
                 , prims_container.view()
                 , cons_container.view()
                 , chars_container.view()
+                , char_eigs.view()
             };
             
         }
@@ -165,7 +171,9 @@ namespace aether::core{
             FaceArrayView y_flux_left;
             FaceArrayView y_flux_right;
 
-            CellsView prim, cons, chars;
+            CellsView prim, cons;
+            CharView chars;
+            eigenvec_view eigs;
         };
 
         // Compile time known numvar parameter 
@@ -178,7 +186,7 @@ namespace aether::core{
         // Declaring domain containers
         CellsSoA prims_container;
         CellsSoA cons_container;
-        CellsSoA chars_container;
+        CharSoA chars_container;
         // Flux and grid extents structs
         Extents ext;
         FaceGridX flux_x_ext;
@@ -192,6 +200,7 @@ namespace aether::core{
 
         FaceArraySoA flux_left_y_container;
         FaceArraySoA flux_right_y_container;
+        eigenvectors char_eigs;
         
         SimulationD() = default;
 
@@ -210,6 +219,7 @@ namespace aether::core{
         , flux_right_x_container(flux_x_ext, quad)
         , flux_left_y_container(flux_y_ext, quad)
         , flux_right_y_container(flux_y_ext, quad)
+        , char_eigs(prims_container.size_flat())
         {}
         
 
@@ -225,6 +235,7 @@ namespace aether::core{
                 , prims_container.view()
                 , cons_container.view()
                 , chars_container.view()
+                , char_eigs.view()
             };
             
         }
@@ -303,7 +314,9 @@ namespace aether::core{
             FaceArrayView z_flux_left;
             FaceArrayView z_flux_right;
 
-            CellsView prim, cons, chars;
+            CellsView prim, cons;
+            CharView chars;
+            eigenvec_view eigs;
         };
 
         // Compile time known numvar parameter 
@@ -316,12 +329,12 @@ namespace aether::core{
         // Declaring domain containers
         CellsSoA prims_container;
         CellsSoA cons_container;
-        CellsSoA chars_container;
+        CharSoA chars_container;
         // Flux and grid extents structs
         Extents ext;
         FaceGridX flux_x_ext;
         FaceGridY flux_y_ext;
-        FaceGridY flux_z_ext;
+        FaceGridZ flux_z_ext;
         // self-explanitory 
         Quadrature quad;
         // Left and Right flux points containers, 
@@ -334,6 +347,7 @@ namespace aether::core{
 
         FaceArraySoA flux_left_z_container;
         FaceArraySoA flux_right_z_container;
+        eigenvectors char_eigs;
         
         SimulationD() = default;
 
@@ -354,6 +368,7 @@ namespace aether::core{
         , flux_right_y_container(flux_y_ext, quad)
         , flux_left_z_container(flux_z_ext, quad)
         , flux_right_z_container(flux_z_ext, quad)
+        , char_eigs(prims_container.size_flat())
         {}
         
 
@@ -371,6 +386,7 @@ namespace aether::core{
                 , prims_container.view()
                 , cons_container.view()
                 , chars_container.view()
+                , char_eigs.view()
             };
             
         }

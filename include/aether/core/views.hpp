@@ -72,6 +72,57 @@ struct CellsSoAT {
     }
 };
 
+template<int NCOMP> 
+struct CharViewT{
+    std::array<double* AETHER_RESTRICT, NCOMP> comp{};  // comp[NCOMP][Flat_index]
+    Extents ext;                        // Extents struct defined in strides.hpp
+    std::size_t N;
+
+    AETHER_INLINE std::size_t idx(int dim, int i, int j=0, int k=0) const {return ext.index(i,j,k) + dim*N;} // Contains the boundary checking built into Extents 
+
+    // Access with fast flat accessor 
+    AETHER_INLINE double & var(int dim, int c, std::size_t flat) {return comp[c][flat + dim*N];}
+    // ---------- Access overload for const instantiations of the Cell View ----------    
+    AETHER_INLINE const double & var(int dim, int c, std::size_t flat) const {return comp[c][flat + dim*N];}
+
+    // Access with index function
+    AETHER_INLINE double & var(int dim, int c, int i, int j = 0, int k = 0) {return comp[c][idx(dim,i,j,k)];}
+    // ---------- Access overload for const instantiations of the Cell View ----------    
+    AETHER_INLINE const double & var(int dim, int c, int i, int j = 0, int k = 0) const {return comp[c][idx(dim,i,j,k)];}
+
+};
+
+// A storage object for charcteristic variables in each dimension
+template<int NCOMP>
+struct CharSoAT {
+    std::array<std::vector<double>,NCOMP> comp; 
+    Extents ext; 
+
+    CharSoAT() = default; // Default empty constructor 
+
+    // ---------- Constructor creates Extents struct and ----------
+    // ---------- Allocates the flat array comp[NumberOfVariables * Dim]
+    // ---------- This gives the number of characteristics needed for each dim
+    CharSoAT(int nx, int ny, int nz, int ng) : ext(nx,ny,nz,ng){
+        const std::size_t N = ext.flat()*AETHER_DIM; 
+        for (int c = 0; c < NCOMP; ++c) comp[c].resize(N);
+    }
+
+    // ---------- Returns the total flattened size of each variable array ----------
+    [[nodiscard]] AETHER_INLINE std::size_t size_flat() const{
+        return (std::size_t(ext.Nx) * ext.Ny * ext.Nz)*AETHER_DIM;
+    }
+
+    // ---------- Returns the CellsView template, used for cell access ----------
+    [[nodiscard]] AETHER_INLINE struct CharViewT<NCOMP> view() noexcept{
+        struct CharViewT<NCOMP> v; 
+        v.ext = ext; 
+        v.N = ext.flat();
+        for (int c = 0; c < NCOMP; ++c) v.comp[c] = comp[c].data();
+        return v;
+    }
+};
+
 // -------------------------------------------------------------
 // ----- Now we make similar containers for the flux faces -----
 // ------------- Containers have the flat structure  -----------
@@ -235,6 +286,8 @@ AETHER_INLINE int face_index(FaceGridZ& gz, int i, int j, int kF) {return int(gz
 
     using CellsView = CellsViewT<aether::phys_ct::numvar>;
     using CellsSoA = CellsSoAT<aether::phys_ct::numvar>;
+    using CharView = CharViewT<aether::phys_ct::numvar>;
+    using CharSoA = CharSoAT<aether::phys_ct::numvar>;
     using FaceArrayView = FaceArrayViewT<aether::phys_ct::numvar>;
     using FaceArraySoA = FaceArraySoAT<aether::phys_ct::numvar>;
 }
