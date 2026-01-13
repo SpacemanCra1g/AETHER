@@ -355,7 +355,7 @@ namespace aether::physics::euler{
         } 
     }
 
-    void calc_eigenvecs(aether::core::CellsView &prim_view,
+    void calc_eigenvecs (aether::core::CellsView &prim_view,
                         aether::core::eigenvec_view &eigs,
                         const double gamma);
 }

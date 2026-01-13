@@ -12,7 +12,7 @@ template <int Dim,int numvar>
 struct eigenvec_viewT{
     aether::math::Mat<numvar> *x_left, *x_right, *y_left, *y_right, *z_left,*z_right;
     std::array<double,5> *x_eigs, *y_eigs, *z_eigs;
-    bool populated;
+    bool *populated;
 
 };
 using eigenvec_view = eigenvec_viewT<AETHER_DIM, aether::phys_ct::numvar>;
@@ -57,7 +57,7 @@ EigenvectorsT(const int num_cells){
     v.x_left = x_left.data();
     v.x_right = x_right.data();
     v.x_eigs = x_eigs.data();
-    v.populated = populated;
+    v.populated = &populated;
 
     if constexpr (Dim > 1) {
     v.y_left = y_left.data();    

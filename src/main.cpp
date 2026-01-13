@@ -1,5 +1,5 @@
-#include "aether/physics/counts.hpp"
-#include "aether/physics/euler/time_controller.hpp"
+// #include "aether/physics/euler/pop_eigs.hpp"
+// #include "aether/physics/euler/time_controller.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/RunParams_io.hpp>
 #include <aether/core/Initialize.hpp>
@@ -33,16 +33,29 @@ int main(){
   std::cout << "The max signal speed is: " << aether::phys::max_propagation_speed(sim);
 
   aether::phys::set_dt(sim);
-  std::cout << "\nThe time step is " << sim.time.dt;
+  std::cout << "\nThe time step is " << sim.time.dt << "\n";
   
-  namespace io = aether::io;
-  io::snapshot_request snap;
-  snap.formats.push_back(io::output_format::plain_txt);
+  aether::io::snapshot_request snap;
+  snap.formats.push_back(aether::io::output_format::plain_txt);
   snap.output_dir = "Output";
   snap.prefix = "snap";
   snap.include_ghosts = true;
 
-  io::write_snapshot(sim, snap);
+  aether::io::write_snapshot(sim, snap);
+
+  // Now we see if we have created the spectral decomposition correctly 
+
+  // First step, populate the eigenvectors 
+    // eigenvectors char_eigs;
+    // eigenvec_view eigs;
+
+    std::cout << "Did I crash?? \n";
+    aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
+    std::cout << sim.char_eigs.x_eigs[45][2] << "\n";
+    std::cout << View.eigs.x_eigs[45][2] << "\n";
+
+  // CharSoA chars_container;
+  // CharView chars;
   
   }; // namespace aether::core
   return 0;

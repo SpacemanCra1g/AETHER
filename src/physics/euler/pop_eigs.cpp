@@ -53,7 +53,6 @@ namespace aether::physics::euler{
  
             fill_eigenvectors(prim, chars, gamma);
         }
-        eigs.populated = true;    
-
+        *eigs.populated = true;    
     }
 }
