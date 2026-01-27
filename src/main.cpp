@@ -1,5 +1,4 @@
-// #include "aether/physics/euler/pop_eigs.hpp"
-// #include "aether/physics/euler/time_controller.hpp"
+#include "aether/core/prim_char_convert.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/RunParams_io.hpp>
 #include <aether/core/Initialize.hpp>
@@ -49,13 +48,31 @@ int main(){
     // eigenvectors char_eigs;
     // eigenvec_view eigs;
 
-    std::cout << "Did I crash?? \n";
+    // std::cout << "Did I crash?? \n";
     aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
-    std::cout << sim.char_eigs.x_eigs[45][2] << "\n";
-    std::cout << View.eigs.x_eigs[45][2] << "\n";
+    // std::cout << sim.char_eigs.x_left[45](3,3) << "\n";
+    // std::cout << View.eigs.x_eigs[45][2] << "\n";
 
   // CharSoA chars_container;
   // CharView chars;
+
+    for (int i = 0; i < 4; ++i){
+    std::cout << View.prim.var(i,20000) << " \n";
+    }
+    prim_to_char(View.prim,View.chars,View.eigs);
+
+    std::cout << "\n";
+    for (int i = 0; i < 4; ++i){
+    std::cout << View.chars.var(0,i,20000) << " \n";
+    }
+
+    y_char_to_prim(View.chars,View.prim,View.eigs);
+
+    std::cout << "\n";
+    for (int i = 0; i < 4; ++i){
+    std::cout << View.prim.var(i,20000) << " \n";
+    }
+    // std::cout << View.chars.var(1,2,100,100,0);
   
   }; // namespace aether::core
   return 0;

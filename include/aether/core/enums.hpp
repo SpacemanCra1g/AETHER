@@ -8,4 +8,5 @@ namespace aether::core {
     enum class test_problem : std::uint8_t {sod=0,sedov=1,sr_shocktube=2,dmr=3, custom=4, load=5};
     enum class boundary_conditions : std::uint8_t {Outflow = 1, Periodic = 2, Reflecting = 3};
     // enum class OutputType : std::uint8_t {text=0,ascii=1,hdf5=2};
+    enum class sweep_dir : std::uint8_t {x=0,y=1,z=2};
 }

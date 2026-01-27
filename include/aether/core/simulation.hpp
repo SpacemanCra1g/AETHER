@@ -1,10 +1,12 @@
 #pragma once
 #include "aether/core/config.hpp"
+#include "aether/core/config_build.hpp"
 #include "aether/core/views.hpp"               // Quadrature SoA, flux and cell views
 #include <aether/core/RunParams.hpp>           // config struct
 #include <aether/core/strides.hpp>             // Extents struct
 #include <aether/physics/counts.hpp>           // number of variables
 #include <aether/core/char_struct.hpp>
+#include <aether/core/enums.hpp>
 
 
 namespace aether::core{
@@ -66,6 +68,7 @@ namespace aether::core{
         FaceArraySoA flux_left_x_container;
         FaceArraySoA flux_right_x_container;
         eigenvectors char_eigs;
+        std::array<sweep_dir, 1> sweeps;
         
         SimulationD() = default;
 
@@ -82,6 +85,7 @@ namespace aether::core{
         , flux_left_x_container(flux_x_ext, quad)
         , flux_right_x_container(flux_x_ext, quad)
         , char_eigs(prims_container.size_flat())
+        , sweeps({sweep_dir::x})
         {}
         
 
@@ -201,6 +205,7 @@ namespace aether::core{
         FaceArraySoA flux_left_y_container;
         FaceArraySoA flux_right_y_container;
         eigenvectors char_eigs;
+        std::array<sweep_dir, 2> sweeps;
         
         SimulationD() = default;
 
@@ -220,6 +225,7 @@ namespace aether::core{
         , flux_left_y_container(flux_y_ext, quad)
         , flux_right_y_container(flux_y_ext, quad)
         , char_eigs(prims_container.size_flat())
+        , sweeps({sweep_dir::x,sweep_dir::y})
         {}
         
 
@@ -348,6 +354,8 @@ namespace aether::core{
         FaceArraySoA flux_left_z_container;
         FaceArraySoA flux_right_z_container;
         eigenvectors char_eigs;
+        std::array<sweep_dir, 3> sweeps;
+        
         
         SimulationD() = default;
 
@@ -369,6 +377,7 @@ namespace aether::core{
         , flux_left_z_container(flux_z_ext, quad)
         , flux_right_z_container(flux_z_ext, quad)
         , char_eigs(prims_container.size_flat())
+        , sweeps({sweep_dir::x,sweep_dir::y,sweep_dir::z})
         {}
         
 
