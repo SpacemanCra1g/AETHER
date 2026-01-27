@@ -69,7 +69,7 @@ namespace aether::core{
         FaceArraySoA flux_right_x_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 1> sweeps;
-        
+
         SimulationD() = default;
 
         // Constructor builds the simulation struct
@@ -206,7 +206,7 @@ namespace aether::core{
         FaceArraySoA flux_right_y_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 2> sweeps;
-        
+
         SimulationD() = default;
 
         // Constructor builds the simulation struct

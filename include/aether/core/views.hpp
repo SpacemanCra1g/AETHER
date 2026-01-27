@@ -133,69 +133,95 @@ struct CharSoAT {
 // -------------------------------------------------------------
 
 struct FaceGridX{
-int NxF{0}, Ny{0}, Nz{0};
+int NxF{0}, Ny{0}, Nz{0}, ng{0};
 std::size_t sy{0}, sz{0};
 
 FaceGridX() = default; 
 explicit FaceGridX(const Extents &e){
-    NxF = e.Nx + 1; Ny = e.Ny; Nz = e.Nz;
+    NxF = e.Nx + 1; Ny = e.Ny; Nz = e.Nz; ng = e.ng;
     sy = std::size_t(NxF); sz = std::size_t(NxF)*Ny;
 }
 
 AETHER_INLINE std::size_t index(int iF, int j, int k) const {
 #if AETHER_BOUNDS_CHECK
-    assert(iF >= 0 && iF < NxF);
-    assert(j  >= 0 && j  < Ny);
-    assert(k  >= 0 && k  < Nz);
+    assert(iF >= -ng && iF < NxF - ng);
+    #if AETHER_DIM > 2
+        assert(k  >= -ng && k  < Nz - ng);
+        assert(j  >= -ng && j  < Ny - ng);
+    #elif AETHER_DIM > 1
+        assert(j  >= -ng && j  < Ny - ng);
+    #endif 
 #endif 
 
-    return std::size_t(iF) + std::size_t(j)*sy + std::size_t(k)*sz;
+    int ii = iF + ng;
+    int jj = j;
+    int kk = k;
+    #if AETHER_DIM > 2
+        kk += ng;
+        jj += ng;
+    #elif AETHER_DIM > 1
+        jj += ng;
+    #endif 
+    return std::size_t(ii) + std::size_t(jj)*sy + std::size_t(kk)*sz;
 }
 
 AETHER_INLINE std::size_t nfaces() const{ return std::size_t(NxF)*Ny*Nz;}
 };
 
 struct FaceGridY{
-int Nx{0}, NyF{0}, Nz{0};
+int Nx{0}, NyF{0}, Nz{0}, ng{0};
 std::size_t sy{0}, sz{0};
 
 FaceGridY() = default; 
 explicit FaceGridY(const Extents &e){
     Nx = e.Nx; NyF = e.Ny+1; Nz = e.Nz;
     sy = std::size_t(Nx); sz = std::size_t(Nx)*NyF;
+    ng = e.ng;
 }
 
 AETHER_INLINE std::size_t index(int i, int jF, int k) const {
 #if AETHER_BOUNDS_CHECK
-    assert(i >= 0 && i < Nx);
-    assert(jF  >= 0 && jF  < NyF);
-    assert(k  >= 0 && k  < Nz);
+    assert(i >= -ng && i < Nx-ng);
+    assert(jF  >= -ng && jF  < NyF-ng);
+    #if AETHER_DIM > 2
+        assert(k  >= -ng && k  < Nz-ng);
+    #endif
 #endif 
 
-    return std::size_t(i) + std::size_t(jF)*sy + std::size_t(k)*sz;
+    int ii = i + ng;
+    int jj = jF + ng;
+    int kk = k;
+    #if AETHER_DIM > 2
+        kk += ng;
+    #endif
+
+    return std::size_t(ii) + std::size_t(jj)*sy + std::size_t(kk)*sz;
 }
 
 AETHER_INLINE std::size_t nfaces() const{ return std::size_t(Nx)*NyF*Nz;}
 };
 
 struct FaceGridZ{
-int Nx{0}, Ny{0}, NzF{0};
+int Nx{0}, Ny{0}, NzF{0}, ng{0};
 std::size_t sy{0}, sz{0};
 
 FaceGridZ() = default; 
 explicit FaceGridZ(const Extents &e){
     Nx = e.Nx; Ny = e.Ny; NzF = e.Nz+1;
     sy = std::size_t(Nx); sz = std::size_t(Nx)*Ny;
+    ng = e.ng;
 }
 
 AETHER_INLINE std::size_t index(int i, int j, int kF) const {
 #if AETHER_BOUNDS_CHECK
-    assert(i >= 0 && i < Nx);
-    assert(j  >= 0 && j  < Ny);
-    assert(kF  >= 0 && kF  < NzF);
+    assert(i >= -ng && i < Nx-ng);
+    assert(j  >= -ng && j  < Ny -ng);
+    assert(kF  >= -ng && kF  < NzF - ng);
 #endif 
-
-    return std::size_t(i) + std::size_t(j)*sy + std::size_t(kF)*sz;
+    const int ii = i +ng;
+    const int jj = j +ng;
+    const int kk = kF +ng;
+    return std::size_t(ii) + std::size_t(jj)*sy + std::size_t(kk)*sz;
 }
 
 AETHER_INLINE std::size_t nfaces() const{ return std::size_t(Nx)*Ny*NzF;}
