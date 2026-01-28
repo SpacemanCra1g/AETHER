@@ -7,10 +7,10 @@
 
 namespace aether::core{
     template<sweep_dir dir>
-    AETHER_INLINE void FOG(Simulation &Sim);
+    AETHER_INLINE void FOG(Simulation &Sim) noexcept;
 
     template<>
-    AETHER_INLINE void FOG<sweep_dir::x>(Simulation &Sim){
+    AETHER_INLINE void FOG<sweep_dir::x>(Simulation &Sim) noexcept{
         auto View = Sim.view();
         auto prims = View.prim;
         auto Cell_ext = prims.ext;
@@ -35,7 +35,7 @@ namespace aether::core{
 
 #if AETHER_DIM > 1
     template<>
-    AETHER_INLINE void FOG<sweep_dir::y>(Simulation &Sim){
+    AETHER_INLINE void FOG<sweep_dir::y>(Simulation &Sim) noexcept{
         auto View = Sim.view();
         auto prims = View.prim;
         auto Cell_ext = prims.ext;
@@ -61,7 +61,7 @@ namespace aether::core{
 
 #if AETHER_DIM > 2
     template<>
-    AETHER_INLINE void FOG<sweep_dir::z>(Simulation &Sim){
+    AETHER_INLINE void FOG<sweep_dir::z>(Simulation &Sim) noexcept{
         auto View = Sim.view();
         auto prims = View.prim;
         auto Cell_ext = prims.ext;

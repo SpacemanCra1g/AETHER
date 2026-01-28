@@ -1,3 +1,4 @@
+#pragma once
 #include <aether/core/config_build.hpp>
 
 namespace aether::prim {

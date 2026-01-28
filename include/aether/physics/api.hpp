@@ -14,9 +14,9 @@ namespace aether{
     namespace phys = ::aether::physics::euler;
 
 #elif AETHER_PHYSICS_MHD==1
-    namespace phys = physics::mhd;
+    namespace phys = ::aether::physics::mhd;
 
 #elif AETHER_PHYSICS_SRHD==1
-    namespace phys = physics::srhd;
+    namespace phys = ::aether::physics::srhd;
 #endif
 }

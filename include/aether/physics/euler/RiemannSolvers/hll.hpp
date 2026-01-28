@@ -5,13 +5,11 @@
 #include <cmath>
 
 namespace aether::physics::euler{
-    AETHER_INLINE prims hll(prims &L, prims &R, const double gamma){
+    AETHER_INLINE prims hll(prims &L, prims &R, const double gamma) noexcept{
         prims Flux;
-        const double aL2 = L.p * gamma /L.rho;
-        const double aR2 = R.p * gamma /R.rho;
-
-        const double aL = std::sqrt(aL2);
-        const double aR = std::sqrt(aR2);
+        
+        const double aL = std::sqrt(L.p * gamma /L.rho);
+        const double aR = std::sqrt(R.p * gamma /R.rho);
 
         const double SL = std::fmin(L.vx - aL, R.vx - aR);
         const double SR = std::fmax(L.vx + aL, R.vx + aR);

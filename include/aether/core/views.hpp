@@ -70,7 +70,117 @@ struct CellsSoAT {
         for (int c = 0; c < NCOMP; ++c) v.comp[c] = comp[c].data();
         return v;
     }
+
+    // ---------- This is a set of operator overloads for the Cells SOA ----------
+    // ---------- very useful for the RK timestepping ----------
+
+    // ---------- assignment operator ----------           
+    AETHER_INLINE CellsSoAT& operator=(const CellsSoAT& rhs) {
+        if (this == &rhs) return *this;
+
+        ext = rhs.ext;
+        const std::size_t N = rhs.size_flat();
+        for (int c = 0; c < NCOMP; ++c) comp[c].resize(N);
+
+        #pragma omp parallel for schedule(static) default(none) shared(rhs, N) collapse(2)
+        for (int c = 0; c < NCOMP; ++c) {
+            for (std::size_t i = 0; i < N; ++i) {
+                comp[c][i] = rhs.comp[c][i];
+            }
+        }
+        return *this;
+    }
+
+    // ---------- scalar multiply ----------
+    AETHER_INLINE CellsSoAT& operator*=(double s) noexcept {
+        const std::size_t N = size_flat();
+
+        #pragma omp parallel for schedule(static) default(none) shared(s, N) collapse(2)
+        for (int c = 0; c < NCOMP; ++c) {
+            for (std::size_t i = 0; i < N; ++i) {
+                comp[c][i] *= s;
+            }
+        }
+        return *this;
+    }
+
+    // ---------- Assignment addition ----------
+    AETHER_INLINE CellsSoAT& operator+=(const CellsSoAT& rhs) noexcept {
+
+        const std::size_t N = size_flat();
+
+        #pragma omp parallel for schedule(static) default(none) shared(rhs, N) collapse(2)
+        for (int c = 0; c < NCOMP; ++c) {
+            for (std::size_t i = 0; i < N; ++i) {
+                comp[c][i] += rhs.comp[c][i];
+            }
+        }
+        return *this;
+    }
+
+    // ---------- Assignment subtraction ----------
+    AETHER_INLINE CellsSoAT& operator-=(const CellsSoAT& rhs) noexcept {
+
+        const std::size_t N = size_flat();
+
+        #pragma omp parallel for schedule(static) default(none) shared(rhs, N) collapse(2)
+        for (int c = 0; c < NCOMP; ++c) {
+            for (std::size_t i = 0; i < N; ++i) {
+                comp[c][i] -= rhs.comp[c][i];
+            }
+        }
+        return *this;
+    }
 };
+
+// ---------- Value-returning operators for Cells SOA ----------
+template<int NCOMP>
+AETHER_INLINE CellsSoAT<NCOMP> operator+(CellsSoAT<NCOMP> lhs, const CellsSoAT<NCOMP>& rhs) {
+    lhs += rhs;
+    return lhs;
+}
+
+template<int NCOMP>
+AETHER_INLINE CellsSoAT<NCOMP> operator-(CellsSoAT<NCOMP> lhs, const CellsSoAT<NCOMP>& rhs) {
+    lhs -= rhs;
+    return lhs;
+}
+
+template<int NCOMP>
+AETHER_INLINE CellsSoAT<NCOMP> operator*(CellsSoAT<NCOMP> lhs, double s) {
+    lhs *= s;
+    return lhs;
+}
+
+template<int NCOMP>
+AETHER_INLINE CellsSoAT<NCOMP> operator*(double s, CellsSoAT<NCOMP> rhs) {
+    rhs *= s;
+    return rhs;
+}
+
+// ---------- BLAS style kernels for Cells SOA ----------
+template<int NCOMP>
+AETHER_INLINE void axpy(CellsSoAT<NCOMP>& y, const double a, const CellsSoAT<NCOMP>& x) noexcept {
+    const std::size_t N = y.size_flat();
+    #pragma omp parallel for schedule(static) default(none) shared(y,x,a,N) collapse(2)
+    for (int c = 0; c < NCOMP; ++c) {
+        for (std::size_t i = 0; i < N; ++i) {
+           y.comp[c][i] += a * x.comp[c][i];
+        }
+    }
+}
+
+template<int NCOMP>
+AETHER_INLINE void axpby(CellsSoAT<NCOMP>& y, const double b, const CellsSoAT<NCOMP>& x, const double a) noexcept {
+    const std::size_t N = y.size_flat();
+    #pragma omp parallel for schedule(static) default(none) shared(y,x,a,b,N) collapse(2)
+    for (int c = 0; c < NCOMP; ++c) {
+        for (std::size_t i = 0; i < N; ++i) {
+            y.comp[c][i] = a * x.comp[c][i] + b * y.comp[c][i];
+        }
+    }
+}
+
 
 template<int NCOMP> 
 struct CharViewT{
