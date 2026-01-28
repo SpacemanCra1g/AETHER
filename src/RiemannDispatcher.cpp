@@ -2,10 +2,9 @@
 #include <aether/core/prim_layout.hpp>
 #include <aether/core/enums.hpp>
 #include <aether/physics/api.hpp>
+#include <stdexcept>
 
 using P = aether::prim::Prim;
-
-
 namespace aether::core{
 
 template<sweep_dir dir>
@@ -177,145 +176,24 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
 #endif
 }
 
-AETHER_INLINE void Riemann_dispatch(Simulation& Sim, double gamma) noexcept {
-#pragma omp parallel default(none) shared(Sim,gamma)
-{
-    if (Sim.cfg.riem == riemann::hll){
-    Riemann_sweep<riemann::hll,sweep_dir::x>(Sim, gamma);
-    #if AETHER_DIM > 1
-    Riemann_sweep<riemann::hll,sweep_dir::y>(Sim, gamma);
-    #endif
-    #if AETHER_DIM > 2
-    Riemann_sweep<riemann::hll,sweep_dir::z>(Sim, gamma);
-    #endif
+AETHER_INLINE void Riemann_dispatch(Simulation& Sim, double gamma){
+    switch (Sim.cfg.riem) {
+        case riemann::hll:{
+            #pragma omp parallel default(none) shared(Sim,gamma)
+            {
+                Riemann_sweep<riemann::hll,sweep_dir::x>(Sim, gamma);
+                #if AETHER_DIM > 1
+                Riemann_sweep<riemann::hll,sweep_dir::y>(Sim, gamma);
+                #endif
+                #if AETHER_DIM > 2
+                Riemann_sweep<riemann::hll,sweep_dir::z>(Sim, gamma);
+                #endif
+            }
+            break;
+        }
+        default:
+            throw std::runtime_error("RiemannSolve: unknown space solver, Dispatch");
     }
-}
 }
 
 }; // namespace aether::core
-
-
-
-/*
-AETHER_INLINE static void HLL_dispatch(Simulation &Sim, const double gamma) noexcept{
-    auto view = Sim.view();
-    auto ext = view.prim.ext;
-    const int nx = ext.nx;
-    const int ny = ext.ny;
-    const int nz = ext.nz;
-    std::size_t face1, face2;
-
-    #pragma omp parallel for schedule(static) collapse(3) default(none) \
-    shared(nx,ny,nz,ext,view,Sim,gamma) private(face1,face2)
-    for (int k = 0; k < nz; k++){
-    for (int j = 0; j < ny; j++){
-    for (int i = -1; i < nx; i++){
-        face1 = Sim.flux_x_ext.index(i, j, k);
-        face2 = Sim.flux_x_ext.index(i+1, j, k);
-        aether::phys::prims L, R, F; 
-        L.rho = view.x_flux_right.var(P::RHO,face1,1);
-        L.vx = view.x_flux_right.var(P::VX,face1,1);
-        L.vy = (AETHER_DIM > 1) ? view.x_flux_right.var(P::VY,face1,1) : 0.0;
-        L.vz = (AETHER_DIM > 2) ? view.x_flux_right.var(P::VZ,face1,1) : 0.0;
-        L.p = view.x_flux_right.var(P::P,face1,1);
-
-
-        R.rho = view.x_flux_left.var(P::RHO,face2,1);
-        R.vx = view.x_flux_left.var(P::VX,face2,1);
-        R.vy = (AETHER_DIM > 1) ? view.x_flux_left.var(P::VY,face2,1) : 0.0;
-        R.vz = (AETHER_DIM > 2) ? view.x_flux_left.var(P::VZ,face2,1) : 0.0;
-        R.p = view.x_flux_left.var(P::P,face2,1);
-
-        F = hll(L, R, gamma);
-
-        view.x_flux_right.var(P::RHO,face1,1) = F.rho;
-        view.x_flux_right.var(P::VX,face1,1) = F.vx;
-        if constexpr (AETHER_DIM > 1){
-            view.x_flux_right.var(P::VY,face1,1) = F.vy;
-        } 
-        if constexpr (AETHER_DIM > 2){
-            view.x_flux_right.var(P::VZ,face1,1) = F.vz;
-        } 
-        view.x_flux_right.var(P::P,face1,1) = F.p;
-    }}}
-
-    #if AETHER_DIM > 1
-    #pragma omp parallel for schedule(static) collapse(3) default(none) \
-    shared(nx,ny,nz,ext,view,Sim,gamma) private(face1,face2)
-    for (int k = 0; k < nz; k++){
-    for (int j = -1; j < ny; j++){
-    for (int i = 0; i < nx; i++){
-        face1 = Sim.flux_y_ext.index(i, j, k);
-        face2 = Sim.flux_y_ext.index(i, j+1, k);
-        aether::phys::prims L, R, F; 
-        L.rho = view.y_flux_right.var(P::RHO,face1,1);
-        L.vx = view.y_flux_right.var(P::VY,face1,1);
-        L.vy = view.y_flux_right.var(P::VX,face1,1);
-        L.vz = (AETHER_DIM > 2) ? view.y_flux_right.var(P::VZ,face1,1) : 0.0;
-        L.p = view.y_flux_right.var(P::P,face1,1);
-
-
-        R.rho = view.y_flux_left.var(P::RHO,face2,1);
-        R.vx = view.y_flux_left.var(P::VY,face2,1);
-        R.vy = view.y_flux_left.var(P::VX,face2,1);
-        R.vz = (AETHER_DIM > 2) ? view.y_flux_left.var(P::VZ,face2,1) : 0.0;        
-        R.p = view.y_flux_left.var(P::P,face2,1);
-
-        F = hll(L, R, gamma);
-
-        view.y_flux_right.var(P::RHO,face1,1) = F.rho;
-        view.y_flux_right.var(P::VX,face1,1) = F.vy;
-        view.y_flux_right.var(P::VY,face1,1) = F.vx;
-        if constexpr (AETHER_DIM > 2){
-            view.y_flux_right.var(P::VZ,face1,1) = F.vz;
-        } 
-        view.y_flux_right.var(P::P,face1,1) = F.p;
-    }}}
-    #endif 
-
-    #if AETHER_DIM > 2
-    #pragma omp parallel for schedule(static) collapse(3) default(none) \
-    shared(nx,ny,nz,ext,view,Sim,gamma) private(face1,face2)
-    for (int k = -1; k < nz; k++){
-    for (int j = 0; j < ny; j++){
-    for (int i = 0; i < nx; i++){
-        face1 = Sim.flux_z_ext.index(i, j, k);
-        face2 = Sim.flux_z_ext.index(i, j, k+1);
-        aether::phys::prims L, R, F; 
-        L.rho = view.z_flux_right.var(P::RHO,face1,1);
-        L.vx  = view.z_flux_right.var(P::VZ,face1,1);
-        L.vy  = view.z_flux_right.var(P::VY,face1,1);
-        L.vz  = view.z_flux_right.var(P::VX,face1,1);
-        L.p   = view.z_flux_right.var(P::P,face1,1);
-
-
-        R.rho = view.z_flux_left.var(P::RHO,face2,1);
-        R.vx  = view.z_flux_left.var(P::VZ,face2,1);
-        R.vy  = view.z_flux_left.var(P::VY,face2,1);
-        R.vz  = view.z_flux_left.var(P::VX,face2,1);
-        R.p   = view.z_flux_left.var(P::P,face2,1);
-
-        F = hll(L, R, gamma);
-
-        view.z_flux_right.var(P::RHO,face1,1) = F.rho;
-        view.z_flux_right.var(P::VX,face1,1) = F.vz;
-        view.z_flux_right.var(P::VY,face1,1) = F.vy;
-        view.z_flux_right.var(P::VZ,face1,1) = F.vx;
-        view.z_flux_right.var(P::P,face1,1) = F.p;
-    }}}
-    #endif
-}
-
-void Riemann(Simulation &Sim){
-    switch (Sim.cfg.riem) {
-        case riemann::hll : 
-            HLL_dispatch(Sim, Sim.grid.gamma);  
-            break;
-
-        default:
-            throw std::runtime_error("Unknown call in Riemann Dispatcher");
-    }
-}
-
-}
-*/
