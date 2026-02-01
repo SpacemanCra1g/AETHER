@@ -4,7 +4,6 @@
 #include <aether/core/enums.hpp>
 #include <cstddef>
 
-
 namespace aether::core {
 
 template <int numvar, sweep_dir dir, class Flux, class Flux_ext>
@@ -15,14 +14,15 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux FW, Flux_ext F_ext, Si
     double dxt = 0.0;
     if constexpr (dir == sweep_dir::x) {
         dxt = sim.time.dt/sim.grid.dx;
-        il = -1;
+        il = 1;
     }else if constexpr (dir == sweep_dir::y) {
         dxt = sim.time.dt/sim.grid.dy;
-        jl = -1;
+        jl = 1;
     }else{
         dxt = sim.time.dt/sim.grid.dz;
-        kl = -1;
+        kl = 1;
     }
+
 
     int kn = sim.grid.nz;
     int jn = sim.grid.ny;
@@ -33,8 +33,8 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux FW, Flux_ext F_ext, Si
     for (int k = 0; k < kn; ++k){
     for (int j = 0; j < jn; ++j){
     for (int i = 0; i < in; ++i){
-        std::size_t Flux_L = F_ext.index(i + il, j + jl, k + kl);
-        std::size_t Flux_R = F_ext.index(i, j, k);
+        std::size_t Flux_R = F_ext.index(i + il, j + jl, k + kl);
+        std::size_t Flux_L = F_ext.index(i, j, k);
         std::size_t cell = view.cons.ext.index(i,j,k);
         for (int var = 0; var < numvar; ++ var){
             if constexpr (dir == sweep_dir::x) {
@@ -43,7 +43,8 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux FW, Flux_ext F_ext, Si
                 out.comp[var][cell] += dxt*(FW.comp[var][Flux_R] - FW.comp[var][Flux_L]);
             }
         }
-        
+
+
     }}}
 }
 
@@ -55,7 +56,7 @@ AETHER_INLINE void flux_diff_sweep(CellsView &out, Simulation &sim) noexcept{
     #pragma omp parallel shared(out,sim,view)
     {   
         auto &F_ext_x = sim.flux_x_ext;
-        auto &Flux_X = view.x_flux_right;
+        auto &Flux_X = view.x_flux;
         flux_sweep<numvar, sweep_dir::x>(out, Flux_X, F_ext_x, sim);
         #if AETHER_DIM > 1
             auto &F_ext_y = sim.flux_y_ext;

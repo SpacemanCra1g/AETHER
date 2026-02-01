@@ -369,7 +369,9 @@ struct FaceArrayViewT {
     assert(q >= 0 && q < Q);
 #endif
 
-    return std::size_t(face_idx)*Q + q;
+        // Removed the Quadrature control because it was causing bugs 
+        // be careful, this may be a problem later
+    return std::size_t(face_idx)*Q;
     }
 
     AETHER_INLINE double& var(int c, int face_idx, int q) {return comp[c][flat(face_idx,q)];}

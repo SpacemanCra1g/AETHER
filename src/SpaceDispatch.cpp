@@ -1,8 +1,7 @@
 #include <aether/core/space_solvers/fog.hpp>
-#include <aether/core/simulation.hpp>
-#include <array>
+#include <aether/core/stencil_templates.hpp>
+#include <aether/core/SpaceDispatch.hpp>
 #include <stdexcept>
-
 
 
 namespace aether::core{
@@ -33,7 +32,8 @@ namespace aether::core{
     std::ptrdiff_t sz = static_cast<std::ptrdiff_t>(ext.sz);
 
     std::size_t cell = 0;
-    std::size_t face = 0;
+    std::size_t faceR = 0;
+    std::size_t faceL = 0;
 
     if constexpr (dir == sweep_dir::x) {
         auto& FL = view.x_flux_left;
@@ -44,18 +44,17 @@ namespace aether::core{
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
             cell = ext.index(i, j, k);
-            face = Sim.flux_x_ext.index(i, j, k);
-
-            const std::size_t fidx = FR.flat(face, 1);
+            faceR = Sim.flux_x_ext.index(i, j, k);
+            faceL = Sim.flux_x_ext.index(i+1, j, k);
 
             CellAccessor<numvar> A{prim_comp, cell, sx, sy, sz};
             Stencil1D<0, numvar, sweep_dir::x> S{A};
 
-            FOG_face_from_stencil<numvar, sweep_dir::x>(S, FL, FR, fidx);
+            FOG_face_from_stencil<numvar, sweep_dir::x>(S, FL, FR, faceL,faceR);
         }
         return;
     }
-
+// This needs refactoring for multi-D problesms
 #if AETHER_DIM > 1
     if constexpr (dir == sweep_dir::y) {
         auto& FL = view.y_flux_left;

@@ -42,6 +42,7 @@ namespace aether::core{
             int nx, quad, ng;
             FaceArrayView x_flux_left;
             FaceArrayView x_flux_right;
+            FaceArrayView x_flux;
             CellsView prim, cons;
             CharView chars;
             eigenvec_view eigs;
@@ -67,6 +68,7 @@ namespace aether::core{
         // each is resized to account for quad points
         FaceArraySoA flux_left_x_container;
         FaceArraySoA flux_right_x_container;
+        FaceArraySoA flux_x_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 1> sweeps;
 
@@ -84,6 +86,7 @@ namespace aether::core{
         , flux_x_ext(ext), quad(grid.quad)
         , flux_left_x_container(flux_x_ext, quad)
         , flux_right_x_container(flux_x_ext, quad)
+        , flux_x_container(flux_x_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x})
         {}
@@ -96,6 +99,7 @@ namespace aether::core{
                 , time.t, grid.nx, grid.quad
                 , grid.ng, flux_left_x_container.view()
                 , flux_right_x_container.view()
+                , flux_x_container.view()
                 , prims_container.view()
                 , cons_container.view()
                 , chars_container.view()
@@ -144,12 +148,6 @@ namespace aether::core{
     // 2 Dimensional template for Simulation struct
     template <> 
     struct SimulationD<2>{
-        // ---------- Set template names to be compile time standard ----------
-        using CellsView = CellsViewT<aether::phys_ct::numvar>;
-        using CellsSoA = CellsSoAT<aether::phys_ct::numvar>;
-        using FaceArrayView = FaceArrayViewT<aether::phys_ct::numvar>;
-        using FaceArraySoA = FaceArraySoAT<aether::phys_ct::numvar>;
-
         // ---------- Sub-structs, containing Time, Grid config, -----------------
         // ---------- and a snapshot only 'view' object, passed by value ----------
         struct Time{
@@ -171,9 +169,11 @@ namespace aether::core{
             int nx, ny, quad, ng;
             FaceArrayView x_flux_left;
             FaceArrayView x_flux_right;
+            FaceArrayView x_flux;
 
             FaceArrayView y_flux_left;
             FaceArrayView y_flux_right;
+            FaceArrayView y_flux;
 
             CellsView prim, cons;
             CharView chars;
@@ -201,9 +201,11 @@ namespace aether::core{
         // each is resized to account for quad points
         FaceArraySoA flux_left_x_container;
         FaceArraySoA flux_right_x_container;
+        FaceArraySoA flux_x_container;
 
         FaceArraySoA flux_left_y_container;
         FaceArraySoA flux_right_y_container;
+        FaceArraySoA flux_y_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 2> sweeps;
 
@@ -222,8 +224,10 @@ namespace aether::core{
         , quad(grid.quad)
         , flux_left_x_container(flux_x_ext, quad)
         , flux_right_x_container(flux_x_ext, quad)
+        , flux_x_container(flux_x_ext, quad)
         , flux_left_y_container(flux_y_ext, quad)
         , flux_right_y_container(flux_y_ext, quad)
+        , flux_y_container(flux_y_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x,sweep_dir::y})
         {}
@@ -236,8 +240,10 @@ namespace aether::core{
                 , time.t, grid.nx, grid.ny, grid.quad
                 , grid.ng, flux_left_x_container.view()
                 , flux_right_x_container.view()
+                , flux_x_container.view()
                 , flux_left_y_container.view()
                 , flux_right_y_container.view()
+                , flux_y_container.view()
                 , prims_container.view()
                 , cons_container.view()
                 , chars_container.view()
@@ -286,12 +292,6 @@ namespace aether::core{
     // 3 Dimensional template for Simulation struct
     template <> 
     struct SimulationD<3>{
-        // ---------- Set template names to be compile time standard ----------
-        using CellsView = CellsViewT<aether::phys_ct::numvar>;
-        using CellsSoA = CellsSoAT<aether::phys_ct::numvar>;
-        using FaceArrayView = FaceArrayViewT<aether::phys_ct::numvar>;
-        using FaceArraySoA = FaceArraySoAT<aether::phys_ct::numvar>;
-
         // ---------- Sub-structs, containing Time, Grid config, -----------------
         // ---------- and a snapshot only 'view' object, passed by value ----------
         struct Time{
@@ -313,12 +313,15 @@ namespace aether::core{
             int nx, ny, nz, quad, ng;
             FaceArrayView x_flux_left;
             FaceArrayView x_flux_right;
+            FaceArrayView x_flux;
 
             FaceArrayView y_flux_left;
             FaceArrayView y_flux_right;
+            FaceArrayView y_flux;
 
             FaceArrayView z_flux_left;
             FaceArrayView z_flux_right;
+            FaceArrayView z_flux;
 
             CellsView prim, cons;
             CharView chars;
@@ -347,12 +350,15 @@ namespace aether::core{
         // each is resized to account for quad points
         FaceArraySoA flux_left_x_container;
         FaceArraySoA flux_right_x_container;
+        FaceArraySoA flux_x_container;
 
         FaceArraySoA flux_left_y_container;
         FaceArraySoA flux_right_y_container;
+        FaceArraySoA flux_y_container;
 
         FaceArraySoA flux_left_z_container;
         FaceArraySoA flux_right_z_container;
+        FaceArraySoA flux_z_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 3> sweeps;
         
@@ -372,10 +378,13 @@ namespace aether::core{
         , quad(grid.quad)
         , flux_left_x_container(flux_x_ext, quad)
         , flux_right_x_container(flux_x_ext, quad)
+        , flux_x_container(flux_x_ext, quad)
         , flux_left_y_container(flux_y_ext, quad)
         , flux_right_y_container(flux_y_ext, quad)
+        , flux_y_container(flux_y_ext, quad)
         , flux_left_z_container(flux_z_ext, quad)
         , flux_right_z_container(flux_z_ext, quad)
+        , flux_z_container(flux_z_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x,sweep_dir::y,sweep_dir::z})
         {}
@@ -388,10 +397,13 @@ namespace aether::core{
                 , time.t, grid.nx, grid.ny, grid.nz, grid.quad
                 , grid.ng, flux_left_x_container.view()
                 , flux_right_x_container.view()
+                , flux_x_container.view()
                 , flux_left_y_container.view()
                 , flux_right_y_container.view()
+                , flux_y_container.view()
                 , flux_left_z_container.view()
                 , flux_right_z_container.view()
+                , flux_z_container.view()
                 , prims_container.view()
                 , cons_container.view()
                 , chars_container.view()

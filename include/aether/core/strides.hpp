@@ -25,6 +25,8 @@ namespace aether::core {
             sx = 1;
             sy = static_cast<std::size_t>(Nx);      // Stride immediately exceeds the domain. Useful for debugging
             sz = static_cast<std::size_t>(Ny) * Nx; // = Nx
+            ny=1;
+            nz=1;
         }
         
         //---------- Tollerant of 2/3D Constructors ----------
@@ -64,7 +66,7 @@ namespace aether::core {
             Ny = ny + 2*ng;
             Nz = 1;
             sx = 1;
-            nz = 0;
+            nz = 1;
             sy = static_cast<std::size_t>(Nx);      // Stride in Y
             sz = static_cast<std::size_t>(Ny) * Nx; // Stride immediately exceeds the domain
         }

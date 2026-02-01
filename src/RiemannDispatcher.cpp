@@ -3,6 +3,7 @@
 #include <aether/core/enums.hpp>
 #include <aether/physics/api.hpp>
 #include <stdexcept>
+#include <iostream>
 
 using P = aether::prim::Prim;
 namespace aether::core{
@@ -51,41 +52,40 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
         // Make sure to switch these two        
         auto& FR = view.x_flux_right;
         auto& FL = view.x_flux_left;
+        auto& Flux = view.x_flux;
 
         #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
 
-            faceL = Sim.flux_x_ext.index(i, j, k);
-            faceR = Sim.flux_x_ext.index(i+1, j, k);
-
-            const std::size_t idx1 = FR.flat(faceL, 1);
-            const std::size_t idx2 = FL.flat(faceR, 1);
+            faceL = Sim.flux_x_ext.index(i+1, j, k);
+            faceR = Sim.flux_x_ext.index(i+2, j, k);
 
             aether::phys::prims L{}, R{}, F{};
 
-            L.rho = FR.comp[P::RHO][idx1];
-            L.vx  = FR.comp[VelMap<dir>::VN][idx1];
-            L.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][idx1] : 0.0;
-            L.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][idx1] : 0.0;
-            L.p   = FR.comp[P::P][idx1];
+            L.rho = FL.comp[P::RHO][faceL];
+            // std::cout << "Left  = " << L.rho << std::endl;
+            L.vx  = FL.comp[VelMap<dir>::VN][faceL];
+            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][faceL] : 0.0;
+            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][faceL] : 0.0;
+            L.p   = FL.comp[P::P][faceL];
 
-            R.rho = FL.comp[P::RHO][idx2];
-            R.vx  = FL.comp[VelMap<dir>::VN][idx2];
-            R.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][idx2] : 0.0;
-            R.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][idx2] : 0.0;
-            R.p   = FL.comp[P::P][idx2];
+            R.rho = FR.comp[P::RHO][faceR];
+            R.vx  = FR.comp[VelMap<dir>::VN][faceR];
+            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][faceR] : 0.0;
+            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][faceR] : 0.0;
+            R.p   = FR.comp[P::P][faceR];
 
             if constexpr (solv == riemann::hll) {
                 F = hll(L, R, gamma);
             }
 
-            FR.comp[P::RHO][idx1] = F.rho;
-            FR.comp[VelMap<dir>::VN][idx1]  = F.vx;
-            if constexpr (AETHER_DIM > 1) FR.comp[VelMap<dir>::VT1][idx1] = F.vy;
-            if constexpr (AETHER_DIM > 2) FR.comp[VelMap<dir>::VT2][idx1] = F.vz;
-            FR.comp[P::P][idx1]   = F.p;
+            Flux.comp[P::RHO][faceL] = F.rho;
+            Flux.comp[VelMap<dir>::VN][faceL]  = F.vx;
+            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][faceL] = F.vy;
+            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][faceL] = F.vz;
+            Flux.comp[P::P][faceL]   = F.p;
         }
     }
 
