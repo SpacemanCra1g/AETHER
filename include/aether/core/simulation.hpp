@@ -116,8 +116,8 @@ namespace aether::core{
             g.y_min = 0.0; g.y_max = 0.0;
             g.x_min = config.x_start; g.x_max = config.x_end;
 
-            g.ny = 0;
-            g.nz = 0;
+            g.ny = 1;
+            g.nz = 1;
             g.nx = config.x_count;
             
             g.quad = config.num_quad;
@@ -259,7 +259,7 @@ namespace aether::core{
             g.x_min = config.x_start; g.x_max = config.x_end;
 
             g.ny = config.y_count;
-            g.nz = 0;
+            g.nz = 1;
             g.nx = config.x_count;
             
             g.quad = config.num_quad;

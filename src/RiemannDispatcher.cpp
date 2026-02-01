@@ -34,7 +34,7 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
     auto ext  = view.prim.ext;
     const int nx = ext.nx, ny = ext.ny, nz = ext.nz;
 
-    std::size_t face1, face2;
+    std::size_t faceL, faceR;
 
     // Loop bounds
     int i0 = 0, i1 = nx;
@@ -49,19 +49,19 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
     // and compute face indices using the correct ext.
     if constexpr (dir == sweep_dir::x) {
         // Make sure to switch these two        
-        auto& FL = view.x_flux_right;
-        auto& FR = view.x_flux_left;
+        auto& FR = view.x_flux_right;
+        auto& FL = view.x_flux_left;
 
-        #pragma omp for collapse(3) schedule(static) private(face1, face2) nowait
+        #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
 
-            face1 = Sim.flux_x_ext.index(i, j, k);
-            face2 = Sim.flux_x_ext.index(i + 1, j, k);
+            faceL = Sim.flux_x_ext.index(i, j, k);
+            faceR = Sim.flux_x_ext.index(i+1, j, k);
 
-            const std::size_t idx1 = FR.flat(face1, 1);
-            const std::size_t idx2 = FL.flat(face2, 1);
+            const std::size_t idx1 = FR.flat(faceL, 1);
+            const std::size_t idx2 = FL.flat(faceR, 1);
 
             aether::phys::prims L{}, R{}, F{};
 
@@ -176,7 +176,7 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
 #endif
 }
 
-AETHER_INLINE void Riemann_dispatch(Simulation& Sim, double gamma){
+void Riemann_dispatch(Simulation& Sim, double gamma){
     switch (Sim.cfg.riem) {
         case riemann::hll:{
             #pragma omp parallel default(none) shared(Sim,gamma)

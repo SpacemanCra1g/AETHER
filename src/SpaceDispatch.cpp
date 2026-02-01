@@ -105,7 +105,7 @@ namespace aether::core{
 
 //---------- Space solver dispatcher ----------
 
-AETHER_INLINE void Space_solve(Simulation& Sim) {
+void Space_solve(Simulation& Sim) {
     switch (Sim.cfg.solve) {
         case solver::fog: {
             #pragma omp parallel default(none) shared(Sim)

@@ -47,5 +47,6 @@ AETHER_INLINE void set_dt(aether::core::Simulation& sim){
     } else{
         sim.time.dt = dt;
     }
+    sim.time.t += dt;
 }
 }

@@ -1,4 +1,4 @@
-#include "aether/core/prim_char_convert.hpp"
+#include "aether/physics/euler/convert.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/RunParams_io.hpp>
 #include <aether/core/Initialize.hpp>
@@ -6,7 +6,10 @@
 #include <aether/io/snapshot.hpp>
 #include <aether/physics/api.hpp>
 #include <aether/core/time_stepper_containers.hpp>
-
+#include <aether/core/SpaceDispatch.hpp>
+#include <aether/core/RiemannDispatch.hpp>
+#include <aether/core/flux_difference.hpp>
+#include <omp.h>
 int main(){
   using namespace aether::core; {
 
@@ -29,11 +32,27 @@ int main(){
 
   std::cout << "Here is the physics name: " << aether::phys::name() << "\n";
 
-  std::cout << "The max signal speed is: " << aether::phys::max_propagation_speed(sim);
+  std::cout << "The max signal speed is: " << aether::phys::max_propagation_speed(sim) << "\n";
 
-  aether::phys::set_dt(sim);
-  std::cout << "\nThe time step is " << sim.time.dt << "\n";
-  
+  // std::cout << sim.time.t << " Start";
+
+  // int count = 0;
+  while (sim.time.t < sim.time.t_end ){
+    // count ++;
+    aether::phys::set_dt(sim);
+    std::cout << "\nThe time step is " << sim.time.t << "\n";
+
+    Space_solve(sim);
+    Riemann_dispatch(sim, sim.grid.gamma);
+
+    flux_diff_sweep(View.prim, sim);
+
+    axpy(sim.cons_container, -1.0, sim.prims_container);
+    boundary_conditions(sim,View.cons);
+    aether::phys::cons_to_prims_domain(sim);
+  }
+    // aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
+
   aether::io::snapshot_request snap;
   snap.formats.push_back(aether::io::output_format::plain_txt);
   snap.output_dir = "Output";
@@ -42,36 +61,6 @@ int main(){
 
   aether::io::write_snapshot(sim, snap);
 
-  // Now we see if we have created the spectral decomposition correctly 
-
-  // First step, populate the eigenvectors 
-    // eigenvectors char_eigs;
-    // eigenvec_view eigs;
-
-    // std::cout << "Did I crash?? \n";
-    aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
-    // std::cout << sim.char_eigs.x_left[45](3,3) << "\n";
-    // std::cout << View.eigs.x_eigs[45][2] << "\n";
-
-  // CharSoA chars_container;
-  // CharView chars;
-
-    for (int i = 0; i < 4; ++i){
-    std::cout << View.prim.var(i,20000) << " \n";
-    }
-    prim_to_char(View.prim,View.chars,View.eigs);
-
-    std::cout << "\n";
-    for (int i = 0; i < 4; ++i){
-    std::cout << View.chars.var(0,i,20000) << " \n";
-    }
-
-    y_char_to_prim(View.chars,View.prim,View.eigs);
-
-    std::cout << "\n";
-    for (int i = 0; i < 4; ++i){
-    std::cout << View.prim.var(i,20000) << " \n";
-    }
     // std::cout << View.chars.var(1,2,100,100,0);
   
   }; // namespace aether::core
