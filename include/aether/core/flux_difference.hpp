@@ -7,7 +7,7 @@
 namespace aether::core {
 
 template <int numvar, sweep_dir dir, class Flux, class Flux_ext>
-AETHER_INLINE static void flux_sweep(CellsView &out, Flux FW, Flux_ext F_ext, Simulation &sim){
+AETHER_INLINE static void flux_sweep(CellsView &out, Flux &FW, Flux_ext &F_ext, Simulation &sim){
     int il = 0;
     int jl = 0;
     int kl = 0;
@@ -23,7 +23,6 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux FW, Flux_ext F_ext, Si
         kl = 1;
     }
 
-
     int kn = sim.grid.nz;
     int jn = sim.grid.ny;
     int in = sim.grid.nx;
@@ -38,16 +37,13 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux FW, Flux_ext F_ext, Si
         std::size_t cell = view.cons.ext.index(i,j,k);
         for (int var = 0; var < numvar; ++ var){
             if constexpr (dir == sweep_dir::x) {
-                out.comp[var][cell] = dxt*(FW.comp[var][Flux_R] - FW.comp[var][Flux_L]);
+                out.comp[var][cell] = dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
             } else{
-                out.comp[var][cell] += dxt*(FW.comp[var][Flux_R] - FW.comp[var][Flux_L]);
+                out.comp[var][cell] = dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
             }
         }
-
-
     }}}
 }
-
 
 AETHER_INLINE void flux_diff_sweep(CellsView &out, Simulation &sim) noexcept{
     constexpr int numvar = aether::phys_ct::numvar; 

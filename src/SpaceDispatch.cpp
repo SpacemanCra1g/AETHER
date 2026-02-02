@@ -52,7 +52,7 @@ namespace aether::core{
 
             FOG_face_from_stencil<numvar, sweep_dir::x>(S, FL, FR, faceL,faceR);
         }
-        return;
+    return;
     }
 // This needs refactoring for multi-D problesms
 #if AETHER_DIM > 1

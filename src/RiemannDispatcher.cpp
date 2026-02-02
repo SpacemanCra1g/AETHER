@@ -3,7 +3,6 @@
 #include <aether/core/enums.hpp>
 #include <aether/physics/api.hpp>
 #include <stdexcept>
-#include <iostream>
 
 using P = aether::prim::Prim;
 namespace aether::core{
@@ -49,7 +48,6 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
     // Select the correct face-state views with compile-time branching
     // and compute face indices using the correct ext.
     if constexpr (dir == sweep_dir::x) {
-        // Make sure to switch these two        
         auto& FR = view.x_flux_right;
         auto& FL = view.x_flux_left;
         auto& Flux = view.x_flux;
@@ -59,121 +57,121 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
 
-            faceL = Sim.flux_x_ext.index(i+1, j, k);
-            faceR = Sim.flux_x_ext.index(i+2, j, k);
+            std::size_t interface_idx = Sim.flux_x_ext.index(i+1, j, k);
 
             aether::phys::prims L{}, R{}, F{};
 
-            L.rho = FL.comp[P::RHO][faceL];
-            // std::cout << "Left  = " << L.rho << std::endl;
-            L.vx  = FL.comp[VelMap<dir>::VN][faceL];
-            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][faceL] : 0.0;
-            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][faceL] : 0.0;
-            L.p   = FL.comp[P::P][faceL];
+            L.rho = FL.comp[P::RHO][interface_idx];
+            L.vx  = FL.comp[VelMap<dir>::VN][interface_idx];
+            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            L.p   = FL.comp[P::P][interface_idx];
 
-            R.rho = FR.comp[P::RHO][faceR];
-            R.vx  = FR.comp[VelMap<dir>::VN][faceR];
-            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][faceR] : 0.0;
-            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][faceR] : 0.0;
-            R.p   = FR.comp[P::P][faceR];
+            R.rho = FR.comp[P::RHO][interface_idx];
+            R.vx  = FR.comp[VelMap<dir>::VN][interface_idx];
+            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            R.p   = FR.comp[P::P][interface_idx];
+
 
             if constexpr (solv == riemann::hll) {
                 F = hll(L, R, gamma);
             }
 
-            Flux.comp[P::RHO][faceL] = F.rho;
-            Flux.comp[VelMap<dir>::VN][faceL]  = F.vx;
-            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][faceL] = F.vy;
-            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][faceL] = F.vz;
-            Flux.comp[P::P][faceL]   = F.p;
+            Flux.comp[P::RHO][interface_idx] = F.rho;
+            Flux.comp[VelMap<dir>::VN][interface_idx]  = F.vx;
+            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
+            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
+            Flux.comp[P::P][interface_idx]   = F.p;
         }
     }
 
 #if AETHER_DIM > 1
     if constexpr (dir == sweep_dir::y) {
-        auto& FL = view.y_flux_right;
-        auto& FR = view.y_flux_left;
+        auto& FR   = view.y_flux_right;
+        auto& FL   = view.y_flux_left;
+        auto& Flux = view.y_flux;
 
-        #pragma omp for collapse(3) schedule(static) private(face1, face2) nowait
+        #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
 
-            face1 = Sim.flux_y_ext.index(i, j, k);
-            face2 = Sim.flux_y_ext.index(i, j + 1, k);
-
-            const std::size_t idx1 = FR.flat(face1, 1);
-            const std::size_t idx2 = FL.flat(face2, 1);
+            // j0 = -1, j runs [-1, ny-1] => j+1 runs [0, ny]
+            std::size_t interface_idx = Sim.flux_y_ext.index(i, j+1, k);
 
             aether::phys::prims L{}, R{}, F{};
 
-            L.rho = FR.comp[P::RHO][idx1];
-            L.vx  = FR.comp[VelMap<dir>::VN][idx1];      // normal = VY, stored in solver slot vx
-            L.vy  = FR.comp[VelMap<dir>::VT1][idx1];     // tangential = VX, stored in solver slot vy
-            L.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][idx1] : 0.0;
-            L.p   = FR.comp[P::P][idx1];
+            // Left state from FL
+            L.rho = FL.comp[P::RHO][interface_idx];
+            L.vx  = FL.comp[VelMap<dir>::VN][interface_idx];
+            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            L.p   = FL.comp[P::P][interface_idx];
 
-            R.rho = FL.comp[P::RHO][idx2];
-            R.vx  = FL.comp[VelMap<dir>::VN][idx2];
-            R.vy  = FL.comp[VelMap<dir>::VT1][idx2];
-            R.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][idx2] : 0.0;
-            R.p   = FL.comp[P::P][idx2];
+            // Right state from FR
+            R.rho = FR.comp[P::RHO][interface_idx];
+            R.vx  = FR.comp[VelMap<dir>::VN][interface_idx];
+            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            R.p   = FR.comp[P::P][interface_idx];
 
             if constexpr (solv == riemann::hll) {
                 F = hll(L, R, gamma);
             }
 
-            FR.comp[P::RHO][idx1] = F.rho;
-            FR.comp[VelMap<dir>::VN][idx1]  = F.vx;      // write normal back to VY
-            FR.comp[VelMap<dir>::VT1][idx1] = F.vy;      // write tangential back to VX
-            if constexpr (AETHER_DIM > 2) FR.comp[VelMap<dir>::VT2][idx1] = F.vz;
-            FR.comp[P::P][idx1]   = F.p;
+            Flux.comp[P::RHO][interface_idx] = F.rho;
+            Flux.comp[VelMap<dir>::VN][interface_idx]  = F.vx;
+            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
+            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
+            Flux.comp[P::P][interface_idx]   = F.p;
         }
     }
 #endif
 
 #if AETHER_DIM > 2
     if constexpr (dir == sweep_dir::z) {
-        auto& FL = view.z_flux_right;
-        auto& FR = view.z_flux_left;
+        auto& FR   = view.z_flux_right;
+        auto& FL   = view.z_flux_left;
+        auto& Flux = view.z_flux;
 
-        #pragma omp for collapse(3) schedule(static) private(face1, face2) nowait
+        #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
 
-            face1 = Sim.flux_z_ext.index(i, j, k);
-            face2 = Sim.flux_z_ext.index(i, j, k + 1);
-
-            const std::size_t idx1 = FR.flat(face1, 1);
-            const std::size_t idx2 = FL.flat(face2, 1);
+            // k0 = -1, k runs [-1, nz-1] => k+1 runs [0, nz]
+            std::size_t interface_idx = Sim.flux_z_ext.index(i, j, k+1);
 
             aether::phys::prims L{}, R{}, F{};
 
-            L.rho = FR.comp[P::RHO][idx1];
-            L.vx  = FR.comp[VelMap<dir>::VN][idx1];      // normal = VZ -> solver vx
-            L.vy  = FR.comp[VelMap<dir>::VT1][idx1];     // tangential = VY -> solver vy
-            L.vz  = FR.comp[VelMap<dir>::VT2][idx1];     // tangential = VX -> solver vz
-            L.p   = FR.comp[P::P][idx1];
+            // Left state from FL
+            L.rho = FL.comp[P::RHO][interface_idx];
+            L.vx  = FL.comp[VelMap<dir>::VN][interface_idx];
+            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            L.p   = FL.comp[P::P][interface_idx];
 
-            R.rho = FL.comp[P::RHO][idx2];
-            R.vx  = FL.comp[VelMap<dir>::VN][idx2];
-            R.vy  = FL.comp[VelMap<dir>::VT1][idx2];
-            R.vz  = FL.comp[VelMap<dir>::VT2][idx2];
-            R.p   = FL.comp[P::P][idx2];
+            // Right state from FR
+            R.rho = FR.comp[P::RHO][interface_idx];
+            R.vx  = FR.comp[VelMap<dir>::VN][interface_idx];
+            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            R.p   = FR.comp[P::P][interface_idx];
 
             if constexpr (solv == riemann::hll) {
                 F = hll(L, R, gamma);
             }
 
-            FR.comp[P::RHO][idx1] = F.rho;
-            FR.comp[VelMap<dir>::VN][idx1]  = F.vx;      // back to VZ
-            FR.comp[VelMap<dir>::VT1][idx1] = F.vy;      // back to VY
-            FR.comp[VelMap<dir>::VT2][idx1] = F.vz;      // back to VX
-            FR.comp[P::P][idx1]   = F.p;
+            Flux.comp[P::RHO][interface_idx] = F.rho;
+            Flux.comp[VelMap<dir>::VN][interface_idx]  = F.vx;
+            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
+            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
+            Flux.comp[P::P][interface_idx]   = F.p;
         }
     }
 #endif
+
 }
 
 void Riemann_dispatch(Simulation& Sim, double gamma){

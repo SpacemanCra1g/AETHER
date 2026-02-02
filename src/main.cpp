@@ -37,10 +37,10 @@ int main(){
   // std::cout << sim.time.t << " Start";
 
   int count = 0;
-  while (sim.time.t < sim.time.t_end && count < 4){
+  while (sim.time.t < sim.time.t_end){
     count ++;
     aether::phys::set_dt(sim);
-    std::cout << "\nThe time step is " << sim.time.t << "\n";
+    // std::cout << "\nThe time step is " << sim.time.t << "\n";
 
     Space_solve(sim);
     Riemann_dispatch(sim, sim.grid.gamma);
