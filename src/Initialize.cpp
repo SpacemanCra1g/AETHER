@@ -167,12 +167,37 @@ static AETHER_INLINE void load_sod_y(Sim &sim){
     
     #pragma omp parallel for private(left) schedule(static)
     for (int j = 0; j < ny; ++j){
-        left = (y_min + (0.5+ j)*dy <= domain_mid);
+        left = (y_min + (0.5+ j)*dy < domain_mid);
         #pragma omp simd
         for (int i = 0; i < nx; ++i){
             domain.prim.var(P::RHO, i, j, 0) = (left) ? 1.0 : 0.125;
             domain.prim.var(P::VX , i, j, 0) = 0.0;
             domain.prim.var(P::P  , i, j, 0) = (left) ? 1.0 : 0.1;
+        }
+    }
+}
+
+template<typename Sim>
+static AETHER_INLINE void load_sod_z(Sim &sim){
+    typename Sim::View domain = sim.view();
+    bool left;
+    const double domain_mid = .5*(sim.grid.z_max + sim.grid.z_min);
+    const double dz = sim.grid.dz;
+    const double z_min = sim.grid.z_min;
+    const int ny = sim.grid.ny;
+    const int nx = sim.grid.nx;
+    const int nz = sim.grid.nz;
+    
+    #pragma omp parallel for private(left) schedule(static)
+    for (int k = 0; k < nz; ++k){
+        left = (z_min + (0.5+ k)*dz < domain_mid);
+        #pragma omp simd
+        for (int j = 0; j < ny; ++j){
+            for (int i = 0; i < nx; ++i){
+                domain.prim.var(P::RHO, i, j, k) = (left) ? 1.0 : 0.125;
+                domain.prim.var(P::VX , i, j, k) = 0.0;
+                domain.prim.var(P::P  , i, j, k) = (left) ? 1.0 : 0.1;
+            }
         }
     }
 }
@@ -194,6 +219,13 @@ void initialize_domain(Sim &sim){
                 case test_problem::sedov : load_sedov<Sim, AETHER_DIM>(sim); break;
                 case test_problem::dmr : load_dmr(sim); break;                
                 case test_problem::sod_y : load_sod_y(sim); break;                
+                default: throw std::runtime_error("Invalid Test problem config");
+            };
+        }
+        else if constexpr (AETHER_DIM==3){
+            switch (sim.cfg.prob) {                
+                case test_problem::sod_z : load_sod_z(sim); break;                
+                case test_problem::sedov : load_sedov<Sim, AETHER_DIM>(sim); break;
                 default: throw std::runtime_error("Invalid Test problem config");
             };
         }

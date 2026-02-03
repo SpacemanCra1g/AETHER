@@ -186,6 +186,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     if (test_prob_lower == "sod_y"){
       cfg.prob = aether::core::test_problem::sod_y; return true;
     }
+    if (test_prob_lower == "sod_z"){
+      cfg.prob = aether::core::test_problem::sod_z; return true;
+    }
     else if (test_prob_lower == "dmr"){
       cfg.prob = aether::core::test_problem::dmr; return true;
     }

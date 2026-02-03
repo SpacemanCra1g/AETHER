@@ -37,7 +37,7 @@ int main(){
   // std::cout << sim.time.t << " Start";
 
   int count = 0;
-  while (sim.time.t < sim.time.t_end && count < 1){
+  do {
     count ++;
     aether::phys::set_dt(sim);
     std::cout << "The time step is " << sim.time.dt << " The current time is " << sim.time.t << "\n";
@@ -46,11 +46,10 @@ int main(){
     Riemann_dispatch(sim, sim.grid.gamma);
 
     flux_diff_sweep(View.prim, sim);
-
     axpy(sim.cons_container, -1.0, sim.prims_container);
     boundary_conditions(sim,View.cons);
     aether::phys::cons_to_prims_domain(sim);
-  }
+  } while (sim.time.t < sim.time.t_end);
     // aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
   std::cout << "The final time is " << sim.time.t << "\n";
   aether::io::snapshot_request snap;

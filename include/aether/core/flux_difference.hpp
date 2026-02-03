@@ -28,6 +28,8 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux &FW, Flux_ext &F_ext, 
     int in = sim.grid.nx;
     auto view = sim.view();
 
+    // The implicit barrier is kept here, need to avoid race condition
+    // on the threads that begin the 2/3D sweeps early
     #pragma omp for collapse(3) schedule(static)
     for (int k = 0; k < kn; ++k){
     for (int j = 0; j < jn; ++j){
