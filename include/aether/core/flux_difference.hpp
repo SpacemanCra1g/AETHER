@@ -39,7 +39,7 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux &FW, Flux_ext &F_ext, 
             if constexpr (dir == sweep_dir::x) {
                 out.comp[var][cell] = dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
             } else{
-                out.comp[var][cell] = dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
+                out.comp[var][cell] += dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
             }
         }
     }}}
@@ -56,12 +56,12 @@ AETHER_INLINE void flux_diff_sweep(CellsView &out, Simulation &sim) noexcept{
         flux_sweep<numvar, sweep_dir::x>(out, Flux_X, F_ext_x, sim);
         #if AETHER_DIM > 1
             auto &F_ext_y = sim.flux_y_ext;
-            auto &Flux_Y = view.y_flux_right;
+            auto &Flux_Y = view.y_flux;
             flux_sweep<numvar, sweep_dir::y>(out, Flux_Y, F_ext_y, sim);
         #endif
         #if AETHER_DIM > 2
             auto &F_ext_z = sim.flux_z_ext;
-            auto &Flux_Z = view.z_flux_right;
+            auto &Flux_Z = view.z_flux;
             flux_sweep<numvar, sweep_dir::z>(out, Flux_Z, F_ext_z, sim);
         #endif
 

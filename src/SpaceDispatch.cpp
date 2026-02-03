@@ -54,7 +54,7 @@ namespace aether::core{
         }
     return;
     }
-// This needs refactoring for multi-D problesms
+// This needs refactoring for multi-D problems
 #if AETHER_DIM > 1
     if constexpr (dir == sweep_dir::y) {
         auto& FL = view.y_flux_left;
@@ -64,15 +64,19 @@ namespace aether::core{
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
-            cell = ext.index(i, j, k);
-            face = Sim.flux_y_ext.index(i, j, k);
 
-            const std::size_t fidx = FR.flat(face, 1);
+            cell  = ext.index(i, j, k);
+
+            // Mirror x-logic:
+            // j runs [-1, ny] because j0=-1, j1=ny+1
+            // faceR at (j), faceL at (j+1)
+            faceR = Sim.flux_y_ext.index(i, j,   k);
+            faceL = Sim.flux_y_ext.index(i, j+1, k);
 
             CellAccessor<numvar> A{prim_comp, cell, sx, sy, sz};
             Stencil1D<0, numvar, sweep_dir::y> S{A};
 
-            FOG_face_from_stencil<numvar, sweep_dir::y>(S, FL, FR, fidx);
+            FOG_face_from_stencil<numvar, sweep_dir::y>(S, FL, FR, faceL, faceR);
         }
         return;
     }
@@ -87,19 +91,24 @@ namespace aether::core{
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
-            cell = ext.index(i, j, k);
-            face = Sim.flux_z_ext.index(i, j, k);
 
-            const std::size_t fidx = FR.flat(face, 1);
+            cell  = ext.index(i, j, k);
+
+            // Mirror x-logic:
+            // k runs [-1, nz] because k0=-1, k1=nz+1
+            // faceR at (k), faceL at (k+1)
+            faceR = Sim.flux_z_ext.index(i, j, k);
+            faceL = Sim.flux_z_ext.index(i, j, k+1);
 
             CellAccessor<numvar> A{prim_comp, cell, sx, sy, sz};
             Stencil1D<0, numvar, sweep_dir::z> S{A};
 
-            FOG_face_from_stencil<numvar, sweep_dir::z>(S, FL, FR, fidx);
+            FOG_face_from_stencil<numvar, sweep_dir::z>(S, FL, FR, faceL, faceR);
         }
         return;
     }
 #endif
+
     }
 
 //---------- Space solver dispatcher ----------

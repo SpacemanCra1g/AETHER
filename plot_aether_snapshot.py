@@ -129,6 +129,119 @@ def assemble_field_2d(table: np.ndarray, var_col: int,
     return Z, (i_min, i_max, j_min, j_max)
 
 
+def build_physical_axis_1d(n: int,
+                           coords_1d: Optional[np.ndarray],
+                           trim_ghosts: bool,
+                           nx_hdr: Optional[int],
+                           xr: Optional[Tuple[float, float]]):
+    """
+    Return x axis of length n in physical coordinates if possible.
+    Priority: coords file -> xrange -> indices.
+    """
+    if coords_1d is not None and coords_1d.shape[1] >= 2:
+        i = coords_1d[:, 0].astype(int)
+        x = coords_1d[:, 1].astype(float)
+
+        i_min, i_max = infer_grid_from_indices_1d(i)
+        nx_tot = i_max - i_min + 1
+        x_dense = np.full((nx_tot,), np.nan, dtype=float)
+        for ii, xv in zip(i, x):
+            x_dense[ii - i_min] = xv
+
+        if trim_ghosts and (nx_hdr is not None):
+            si0 = max(0 - i_min, 0)
+            si1 = min((nx_hdr - 1) - i_min, x_dense.shape[0] - 1)
+            x_dense = x_dense[si0:si1 + 1]
+
+        if np.all(np.isfinite(x_dense)) and len(x_dense) == n:
+            return x_dense, 'x'
+
+    if xr is not None:
+        xmin, xmax = xr
+        if n > 1:
+            return np.linspace(xmin, xmax, n), 'x'
+        else:
+            return np.array([0.5 * (xmin + xmax)]), 'x'
+
+    return np.arange(n, dtype=float), 'i'
+
+
+def build_physical_axes_2d(Z: np.ndarray,
+                           coords_2d: Optional[np.ndarray],
+                           trim_ghosts: bool,
+                           nx_hdr: Optional[int], ny_hdr: Optional[int],
+                           xr: Optional[Tuple[float, float]],
+                           yr: Optional[Tuple[float, float]]):
+    """
+    Build (x_vec, y_vec, extent, (xlab, ylab)) for imshow and slicing.
+
+    Priority:
+      - coords file (i j x y): dense vectors for x and y if possible (structured grid assumption)
+      - xrange/yrange: uniform vectors
+      - else: index vectors
+    """
+    ny, nx = Z.shape
+
+    # 1) From coords file: attempt to make dense x(i) and y(j)
+    if coords_2d is not None and coords_2d.shape[1] >= 4:
+        ij = coords_2d[:, :2].astype(int)
+        xs = coords_2d[:, 2].astype(float)
+        ys = coords_2d[:, 3].astype(float)
+
+        i_min, i_max, j_min, j_max = infer_grid_from_indices_2d(ij)
+
+        nx_tot = i_max - i_min + 1
+        ny_tot = j_max - j_min + 1
+
+        x_vec = np.full((nx_tot,), np.nan, dtype=float)
+        y_vec = np.full((ny_tot,), np.nan, dtype=float)
+
+        for (ii, jj), xv, yv in zip(ij, xs, ys):
+            if np.isnan(x_vec[ii - i_min]):
+                x_vec[ii - i_min] = xv
+            if np.isnan(y_vec[jj - j_min]):
+                y_vec[jj - j_min] = yv
+
+        # Match trimming used by assemble_field_2d
+        if trim_ghosts and (nx_hdr is not None) and (ny_hdr is not None):
+            # assemble_field_2d trims to i,j in [0..nx_hdr-1],[0..ny_hdr-1]
+            # but coords may have i_min/j_min offsets due to ghosts, so slice accordingly
+            si0 = max(0 - i_min, 0)
+            sj0 = max(0 - j_min, 0)
+            x_vec = x_vec[si0: si0 + nx_hdr]
+            y_vec = y_vec[sj0: sj0 + ny_hdr]
+        else:
+            # Otherwise just truncate to Z shape
+            x_vec = x_vec[:nx]
+            y_vec = y_vec[:ny]
+
+        if (len(x_vec) == nx) and (len(y_vec) == ny) and np.all(np.isfinite(x_vec)) and np.all(np.isfinite(y_vec)):
+            extent = (float(x_vec.min()), float(x_vec.max()), float(y_vec.min()), float(y_vec.max()))
+            return x_vec, y_vec, extent, ('x', 'y')
+
+    # 2) From ranges / fallback
+    if xr is not None:
+        x_vec = np.linspace(xr[0], xr[1], nx) if nx > 1 else np.array([0.5 * (xr[0] + xr[1])])
+        xlab = 'x'
+    else:
+        x_vec = np.arange(nx, dtype=float)
+        xlab = 'i'
+
+    if yr is not None:
+        y_vec = np.linspace(yr[0], yr[1], ny) if ny > 1 else np.array([0.5 * (yr[0] + yr[1])])
+        ylab = 'y'
+    else:
+        y_vec = np.arange(ny, dtype=float)
+        ylab = 'j'
+
+    extent = (float(x_vec.min()), float(x_vec.max()), float(y_vec.min()), float(y_vec.max())) if (xr is not None or yr is not None) else None
+    return x_vec, y_vec, extent, (xlab, ylab)
+
+
+def nearest_index(vec: np.ndarray, value: float) -> int:
+    return int(np.argmin(np.abs(vec - value)))
+
+
 def main():
     ap = argparse.ArgumentParser(description='Plot AETHER plaintext snapshot (1D/2D).')
     ap.add_argument('snapshot', help='Path to snapshot .txt file')
@@ -137,6 +250,23 @@ def main():
     ap.add_argument('--coords', type=str, default=None, help='Optional coordinates file: 1D (i x) or 2D (i j x y)')
     ap.add_argument('--output', type=str, default=None, help='Optional output image path (.png). Defaults next to snapshot')
     ap.add_argument('--title', type=str, default=None, help='Optional plot title')
+
+    # New: 2D slicing options
+    ap.add_argument('--slice-axis', choices=['x', 'y'], default=None,
+                    help='For 2D snapshots: plot a 1D slice along x or y instead of a 2D image.')
+    ap.add_argument('--slice-index', type=int, default=None,
+                    help='Index of the orthogonal direction for slicing (j for x-slice, i for y-slice). '
+                         'If omitted, uses the midpoint.')
+    ap.add_argument('--slice-value', type=float, default=None,
+                    help='Physical coordinate of the orthogonal direction for slicing (y for x-slice, x for y-slice). '
+                         'Nearest slice is chosen. Requires --coords or --xrange/--yrange.')
+
+    # New: physical axis ranges (fallback when coords not available)
+    ap.add_argument('--xrange', type=float, nargs=2, default=None, metavar=('XMIN', 'XMAX'),
+                    help='Physical x-range to use when coords are not available (e.g. --xrange -1 1).')
+    ap.add_argument('--yrange', type=float, nargs=2, default=None, metavar=('YMIN', 'YMAX'),
+                    help='Physical y-range to use when coords are not available (e.g. --yrange -1 1).')
+
     args = ap.parse_args()
 
     table, hdr = load_snapshot_table(args.snapshot)
@@ -144,7 +274,6 @@ def main():
 
     # Detect dimension: prefer header; fall back to number of index columns by dim=None
     if dim is None:
-        # Heuristic: if table has >=3 cols, assume first two are i,j (2D). If only >=2, assume 1D.
         dim = 2 if table.shape[1] >= 3 else 1
 
     ncols = table.shape[1]
@@ -160,48 +289,29 @@ def main():
     ng, nx_hdr, ny_hdr = hdr.get('ng'), hdr.get('nx'), hdr.get('ny')
 
     # Optional coordinates
-    x_coords = None
-    y_coords = None
-    extent = None
-
     coords = None
     if args.coords:
         coords = load_coords_table(args.coords)
         if coords is None:
             print('[warn] Could not load coords file; proceeding without physical coordinates.', file=sys.stderr)
 
+    xr = tuple(args.xrange) if args.xrange is not None else None
+    yr = tuple(args.yrange) if args.yrange is not None else None
+
     plt.figure()
 
     if dim == 1:
-        # Assemble 1D
-        y, bounds = assemble_field_1d(table, var_col, args.trim_ghosts, ng, nx_hdr)
-
-        # Build x-axis
-        if coords is not None and coords.shape[1] >= 2:
-            # Expect (i x) at least; if user includes more cols, take col 1 as x
-            i = coords[:, 0].astype(int)
-            x = coords[:, 1].astype(float)
-
-            # Map by i index into a dense vector
-            i_min, i_max = infer_grid_from_indices_1d(i)
-            nx_tot = i_max - i_min + 1
-            x_dense = np.full((nx_tot,), np.nan, dtype=float)
-            for ii, xv in zip(i, x):
-                x_dense[ii - i_min] = xv
-
-            if args.trim_ghosts and (nx_hdr is not None):
-                # Trim to [0, nx_hdr-1]
-                si0 = max(0 - i_min, 0)
-                si1 = min((nx_hdr - 1) - i_min, x_dense.shape[0] - 1)
-                x_dense = x_dense[si0:si1 + 1]
-
-            x_coords = x_dense
-        else:
-            # Fall back to integer i locations
-            x_coords = np.arange(len(y), dtype=float)
+        y, _ = assemble_field_1d(table, var_col, args.trim_ghosts, ng, nx_hdr)
+        x_coords, x_label = build_physical_axis_1d(
+            n=len(y),
+            coords_1d=coords,
+            trim_ghosts=args.trim_ghosts,
+            nx_hdr=nx_hdr,
+            xr=xr
+        )
 
         plt.plot(x_coords, y)
-        plt.xlabel('x' if (coords is not None and coords.shape[1] >= 2) else 'i')
+        plt.xlabel(x_label)
         plt.ylabel(f'v{args.var}')
 
         if args.title:
@@ -210,36 +320,82 @@ def main():
             plt.title(f"step {hdr['step']}  t={hdr['t']:.6g}  v{args.var}")
 
     elif dim == 2:
-        # Assemble 2D
-        Z, bounds = assemble_field_2d(table, var_col, args.trim_ghosts, ng, nx_hdr, ny_hdr)
+        Z, _ = assemble_field_2d(table, var_col, args.trim_ghosts, ng, nx_hdr, ny_hdr)
 
-        if coords is not None and coords.shape[1] >= 4:
-            x_min, x_max = coords[:, 2].min(), coords[:, 2].max()
-            y_min, y_max = coords[:, 3].min(), coords[:, 3].max()
-            extent = (x_min, x_max, y_min, y_max)
-        elif args.coords:
-            print('[warn] Coords file format for 2D should be (i j x y); proceeding without extent.', file=sys.stderr)
+        x_vec, y_vec, extent, (xlab, ylab) = build_physical_axes_2d(
+            Z=Z,
+            coords_2d=coords,
+            trim_ghosts=args.trim_ghosts,
+            nx_hdr=nx_hdr,
+            ny_hdr=ny_hdr,
+            xr=xr,
+            yr=yr
+        )
 
-        # Compute proportional aspect
-        if extent is not None:
-            dx, dy = extent[1] - extent[0], extent[3] - extent[2]
-            aspect_ratio = dx / dy if dy != 0 else 1.0
+        # Slice requested -> 1D plot
+        if args.slice_axis is not None:
+            # slice_value requires some notion of physical coordinates
+            if args.slice_value is not None:
+                if (args.slice_axis == 'x') and (coords is None) and (yr is None):
+                    print('[error] --slice-value with --slice-axis x requires --coords or --yrange.', file=sys.stderr)
+                    sys.exit(2)
+                if (args.slice_axis == 'y') and (coords is None) and (xr is None):
+                    print('[error] --slice-value with --slice-axis y requires --coords or --xrange.', file=sys.stderr)
+                    sys.exit(2)
+
+            if args.slice_axis == 'x':
+                # plot vs x at fixed j (fixed y)
+                if args.slice_value is not None:
+                    j0 = nearest_index(y_vec, args.slice_value)
+                else:
+                    j0 = args.slice-index if args.slice_index is not None else (Z.shape[0] // 2)
+                j0 = max(0, min(Z.shape[0] - 1, j0))
+
+                line = Z[j0, :]
+                plt.plot(x_vec, line)
+                plt.xlabel(xlab)
+                plt.ylabel(f'v{args.var}')
+                y_val = float(y_vec[j0])
+                plt.title(args.title if args.title else f"v{args.var} slice at {ylab}={y_val:.6g}")
+
+            else:  # slice_axis == 'y'
+                # plot vs y at fixed i (fixed x)
+                if args.slice_value is not None:
+                    i0 = nearest_index(x_vec, args.slice_value)
+                else:
+                    i0 = args.slice_index if args.slice_index is not None else (Z.shape[1] // 2)
+                i0 = max(0, min(Z.shape[1] - 1, i0))
+
+                line = Z[:, i0]
+                plt.plot(y_vec, line)
+                plt.xlabel(ylab)
+                plt.ylabel(f'v{args.var}')
+                x_val = float(x_vec[i0])
+                plt.title(args.title if args.title else f"v{args.var} slice at {xlab}={x_val:.6g}")
+
         else:
-            ny, nx = Z.shape
-            aspect_ratio = nx / ny if ny != 0 else 1.0
+            # Default 2D image
+            if extent is not None:
+                dx, dy = extent[1] - extent[0], extent[3] - extent[2]
+                aspect_ratio = dx / dy if dy != 0 else 1.0
+            else:
+                ny, nx = Z.shape
+                aspect_ratio = nx / ny if ny != 0 else 1.0
 
-        im = plt.imshow(Z, origin='lower',
-                        extent=extent if extent is not None else None,
-                        aspect=aspect_ratio)
+            im = plt.imshow(
+                Z, origin='lower',
+                extent=extent if extent is not None else None,
+                aspect=aspect_ratio
+            )
 
-        plt.colorbar(im, label=f'v{args.var}')
-        plt.xlabel('i' if extent is None else 'x')
-        plt.ylabel('j' if extent is None else 'y')
+            plt.colorbar(im, label=f'v{args.var}')
+            plt.xlabel(xlab)
+            plt.ylabel(ylab)
 
-        if args.title:
-            plt.title(args.title)
-        elif hdr.get('step') is not None and hdr.get('t') is not None:
-            plt.title(f"step {hdr['step']}  t={hdr['t']:.6g}  v{args.var}")
+            if args.title:
+                plt.title(args.title)
+            elif hdr.get('step') is not None and hdr.get('t') is not None:
+                plt.title(f"step {hdr['step']}  t={hdr['t']:.6g}  v{args.var}")
 
     else:
         print(f"[error] dim={dim} not supported by this script (only 1D/2D).", file=sys.stderr)

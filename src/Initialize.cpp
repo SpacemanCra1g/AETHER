@@ -155,6 +155,28 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
     }
 }
 
+template<typename Sim>
+static AETHER_INLINE void load_sod_y(Sim &sim){
+    typename Sim::View domain = sim.view();
+    bool left;
+    const double domain_mid = .5*(sim.grid.y_max + sim.grid.y_min);
+    const double dy = sim.grid.dy;
+    const double y_min = sim.grid.y_min;
+    const int ny = sim.grid.ny;
+    const int nx = sim.grid.nx;
+    
+    #pragma omp parallel for private(left) schedule(static)
+    for (int j = 0; j < ny; ++j){
+        left = (y_min + (0.5+ j)*dy <= domain_mid);
+        #pragma omp simd
+        for (int i = 0; i < nx; ++i){
+            domain.prim.var(P::RHO, i, j, 0) = (left) ? 1.0 : 0.125;
+            domain.prim.var(P::VX , i, j, 0) = 0.0;
+            domain.prim.var(P::P  , i, j, 0) = (left) ? 1.0 : 0.1;
+        }
+    }
+}
+
 namespace aether::core {
 using Sim = Simulation;
 
@@ -171,6 +193,7 @@ void initialize_domain(Sim &sim){
             switch (sim.cfg.prob) {                
                 case test_problem::sedov : load_sedov<Sim, AETHER_DIM>(sim); break;
                 case test_problem::dmr : load_dmr(sim); break;                
+                case test_problem::sod_y : load_sod_y(sim); break;                
                 default: throw std::runtime_error("Invalid Test problem config");
             };
         }

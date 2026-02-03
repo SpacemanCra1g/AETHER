@@ -77,7 +77,7 @@ AETHER_INLINE static void outflow_bc(CellsView &var){
 
         } //OpenMP parallel boundary
     } // End (if Dim == 2)
-} // End Outflow bc
+} 
 
 AETHER_INLINE static void periodic_bc(CellsView &var){
     constexpr int numvar = phys_ct::numvar;
@@ -150,7 +150,7 @@ AETHER_INLINE static void periodic_bc(CellsView &var){
         } // openMP parallel end
     } // End 2D case
 }
-
+ 
 // Dispatch function to call the boundary condition method
 void boundary_conditions(Simulation& Sim,CellsView& var){
     switch (Sim.cfg.bc) {
