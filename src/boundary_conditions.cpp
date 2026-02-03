@@ -40,7 +40,7 @@ AETHER_INLINE static void outflow_bc(CellsView &var){
         const int nx = var.ext.nx;
         const int ny = var.ext.ny;
 
-        #pragma omp parallel default(none) shared(ng,nx,ny,var)
+        #pragma omp parallel default(none) shared(ng,nx,ny,var,numvar)
         {
             // x-faces (left/right), for all interior y
             #pragma omp for schedule(static) collapse(3) nowait

@@ -34,8 +34,6 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
     auto ext  = view.prim.ext;
     const int nx = ext.nx, ny = ext.ny, nz = ext.nz;
 
-    std::size_t faceL, faceR;
-
     // Loop bounds
     int i0 = 0, i1 = nx;
     int j0 = 0, j1 = ny;
@@ -52,7 +50,7 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
         auto& FL = view.x_flux_left;
         auto& Flux = view.x_flux;
 
-        #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
+        #pragma omp for collapse(3) schedule(static) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
@@ -92,7 +90,7 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
         auto& FL   = view.y_flux_left;
         auto& Flux = view.y_flux;
 
-        #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
+        #pragma omp for collapse(3) schedule(static) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
@@ -135,7 +133,7 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
         auto& FL   = view.z_flux_left;
         auto& Flux = view.z_flux;
 
-        #pragma omp for collapse(3) schedule(static) private(faceL, faceR) nowait
+        #pragma omp for collapse(3) schedule(static) nowait
         for (int k = k0; k < k1; ++k)
         for (int j = j0; j < j1; ++j)
         for (int i = i0; i < i1; ++i) {
