@@ -61,14 +61,14 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
 
             L.rho = FL.comp[P::RHO][interface_idx];
             L.vx  = FL.comp[VelMap<dir>::VN][interface_idx];
-            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
-            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            L.vy  = (P::HAS_VY) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            L.vz  = (P::HAS_VZ) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
             L.p   = FL.comp[P::P][interface_idx];
 
             R.rho = FR.comp[P::RHO][interface_idx];
             R.vx  = FR.comp[VelMap<dir>::VN][interface_idx];
-            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
-            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            R.vy  = (P::HAS_VY) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
+            R.vz  = (P::HAS_VZ) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
             R.p   = FR.comp[P::P][interface_idx];
 
 
@@ -78,8 +78,8 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
 
             Flux.comp[P::RHO][interface_idx] = F.rho;
             Flux.comp[VelMap<dir>::VN][interface_idx]  = F.vx;
-            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
-            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
+            if constexpr (P::HAS_VY) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
+            if constexpr (P::HAS_VZ) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
             Flux.comp[P::P][interface_idx]   = F.p;
         }
     }
@@ -103,15 +103,15 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
             // Left state from FL
             L.rho = FL.comp[P::RHO][interface_idx];
             L.vx  = FL.comp[VelMap<dir>::VN][interface_idx];
-            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
-            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            L.vy  = FL.comp[VelMap<dir>::VT1][interface_idx];
+            L.vz  = (P::HAS_VZ) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
             L.p   = FL.comp[P::P][interface_idx];
 
             // Right state from FR
             R.rho = FR.comp[P::RHO][interface_idx];
             R.vx  = FR.comp[VelMap<dir>::VN][interface_idx];
-            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
-            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            R.vy  = FR.comp[VelMap<dir>::VT1][interface_idx];
+            R.vz  = (P::HAS_VZ) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
             R.p   = FR.comp[P::P][interface_idx];
 
             if constexpr (solv == riemann::hll) {
@@ -120,8 +120,8 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
 
             Flux.comp[P::RHO][interface_idx] = F.rho;
             Flux.comp[VelMap<dir>::VN][interface_idx]  = F.vx;
-            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
-            if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
+            Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
+            if constexpr (P::HAS_VZ) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
             Flux.comp[P::P][interface_idx]   = F.p;
         }
     }
@@ -146,15 +146,15 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
             // Left state from FL
             L.rho = FL.comp[P::RHO][interface_idx];
             L.vx  = FL.comp[VelMap<dir>::VN][interface_idx];
-            L.vy  = (AETHER_DIM > 1) ? FL.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
-            L.vz  = (AETHER_DIM > 2) ? FL.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            L.vy  = FL.comp[VelMap<dir>::VT1][interface_idx];
+            L.vz  = FL.comp[VelMap<dir>::VT2][interface_idx];
             L.p   = FL.comp[P::P][interface_idx];
 
             // Right state from FR
             R.rho = FR.comp[P::RHO][interface_idx];
             R.vx  = FR.comp[VelMap<dir>::VN][interface_idx];
-            R.vy  = (AETHER_DIM > 1) ? FR.comp[VelMap<dir>::VT1][interface_idx] : 0.0;
-            R.vz  = (AETHER_DIM > 2) ? FR.comp[VelMap<dir>::VT2][interface_idx] : 0.0;
+            R.vy  = FR.comp[VelMap<dir>::VT1][interface_idx];
+            R.vz  = FR.comp[VelMap<dir>::VT2][interface_idx];
             R.p   = FR.comp[P::P][interface_idx];
 
             if constexpr (solv == riemann::hll) {
@@ -163,7 +163,7 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, const double gamma) noexcept {
 
             Flux.comp[P::RHO][interface_idx] = F.rho;
             Flux.comp[VelMap<dir>::VN][interface_idx]  = F.vx;
-            if constexpr (AETHER_DIM > 1) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
+            if constexpr (P::) Flux.comp[VelMap<dir>::VT1][interface_idx] = F.vy;
             if constexpr (AETHER_DIM > 2) Flux.comp[VelMap<dir>::VT2][interface_idx] = F.vz;
             Flux.comp[P::P][interface_idx]   = F.p;
         }

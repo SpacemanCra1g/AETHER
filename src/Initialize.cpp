@@ -152,6 +152,10 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
         domain.prim.var(P::RHO, i, 0, 0) = (left) ? 1.0 : 0.125;
         domain.prim.var(P::VX , i, 0, 0) = 0.0;
         domain.prim.var(P::P  , i, 0, 0) = (left) ? 1.0 : 0.1;
+        if constexpr (P::HAS_VY){
+            domain.prim.var(P::VY, i, 0, 0) = (left) ? 6.0 : 0.0;
+        }
+        if constexpr (P::HAS_VZ) domain.prim.var(P::VZ, i, 0, 0) = 0.0;
     }
 }
 

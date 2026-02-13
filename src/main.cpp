@@ -55,7 +55,7 @@ int main(){
   aether::io::snapshot_request snap;
   snap.formats.push_back(aether::io::output_format::plain_txt);
   snap.output_dir = "Output";
-  snap.prefix = "snap";
+  snap.prefix = "snap"; 
   snap.include_ghosts = true;
 
   aether::io::write_snapshot(sim, snap);

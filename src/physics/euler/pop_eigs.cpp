@@ -17,11 +17,11 @@ namespace aether::physics::euler{
 
             prim.rho = prim_view.var(P::RHO,i);
             prim.vx = prim_view.var(P::VX,i);
-            if constexpr (AETHER_DIM > 1){
+            if constexpr (P::HAS_VY){
                  prim.vy = prim_view.var(P::VY,i);
             } else{prim.vy = 0.0; }
 
-            if constexpr (AETHER_DIM > 2){
+            if constexpr (P::HAS_VZ){
                  prim.vz = prim_view.var(P::VZ,i);
             } else{prim.vz = 0.0; }
             

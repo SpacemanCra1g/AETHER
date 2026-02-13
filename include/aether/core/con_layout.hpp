@@ -1,8 +1,9 @@
 #pragma once
+#include "aether/physics/counts.hpp"
 #include <aether/core/config_build.hpp>
 
 namespace aether::con {
-
+constexpr int numvar = aether::phys_ct::numvar;
 // Physics kind codes must match config_build.hpp: 1=Euler, 2=SRHD, 3=MHD
 template<int DIM, int PHYS> struct Layout;
 
@@ -14,8 +15,8 @@ struct Layout<DIM, 1> {
   static constexpr int MX  = 1;
 
   // Presence flags (compile-time)
-  static constexpr bool HAS_MY = (DIM >= 2);
-  static constexpr bool HAS_MZ = (DIM == 3);
+  static constexpr bool HAS_MY = (numvar >= 4);
+  static constexpr bool HAS_MZ = (numvar == 5);
 
   // Indices (−1 when absent; guarded by HAS_* in if constexpr)
   static constexpr int MY = HAS_MY ? 2 : -1;

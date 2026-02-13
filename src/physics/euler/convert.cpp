@@ -18,8 +18,8 @@ void cons_to_prims_domain(aether::core::Simulation &sim){
         cons con; 
         con.rho = view.cons.var(C::RHO,i); 
         con.mx = view.cons.var(C::MX,i); 
-        con.my = (AETHER_DIM > 1) ? view.cons.var(C::MY,i) : 0.0; 
-        con.mz = (AETHER_DIM > 2) ? view.cons.var(C::MZ,i) : 0.0; 
+        con.my = (C::HAS_MY) ? view.cons.var(C::MY,i) : 0.0; 
+        con.mz = (C::HAS_MZ) ? view.cons.var(C::MZ,i) : 0.0; 
         con.E = view.cons.var(C::E,i); 
 
         auto prim = cons_to_prims_cell(con,gamma);
@@ -49,8 +49,8 @@ void prims_to_cons_domain(aether::core::Simulation &sim){
         prims prim; 
         prim.rho = view.prim.var(P::RHO,i); 
         prim.vx = view.prim.var(P::VX,i); 
-        prim.vy = (AETHER_DIM > 1) ? view.prim.var(P::VY,i) : 0.0; 
-        prim.vz = (AETHER_DIM > 2) ? view.prim.var(P::VZ,i) : 0.0; 
+        prim.vy = (P::HAS_VY) ? view.prim.var(P::VY,i) : 0.0; 
+        prim.vz = (P::HAS_VZ) ? view.prim.var(P::VZ,i) : 0.0; 
         prim.p = view.prim.var(P::P,i); 
 
         auto con = prims_to_cons_cell(prim,gamma);

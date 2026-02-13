@@ -33,6 +33,9 @@ set_property(CACHE AETHER_DIM PROPERTY STRINGS 1 2 3)
 set(AETHER_PHYSICS "Euler" CACHE STRING "Physics module: Euler, MHD, SRHD")
 set_property(CACHE AETHER_PHYSICS PROPERTY STRINGS Euler MHD SRHD)
 
+set(AETHER_FORCE_DIM "0" CACHE STRING "Set more tangent velo components than the dimension default, 0 (off), 2, 3")
+set_property(CACHE AETHER_FORCE_DIM PROPERTY STRINGS 0 2 3)
+
 # ---- CUDA language support if enabled ---------------------------------------
 if(ENABLE_CUDA)
   enable_language(CUDA)
@@ -66,6 +69,15 @@ endif()
 set(AETHER_ENABLE_CUDA_INT 0)
 if(ENABLE_CUDA)
   set(AETHER_ENABLE_CUDA_INT 1)
+endif()
+
+set(AETHER_FORCED_DIM_INT 0)
+if(AETHER_FORCE_DIM)
+  set(AETHER_FORCED_DIM_INT 1)
+endif()
+if(AETHER_FORCE_DIM STREQUAL 1)
+  set(AETHER_FORCED_DIM_INT 0)
+  set(AETHER_FORCE_DIM "0")  
 endif()
 
 # Physics selection
