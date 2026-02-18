@@ -28,6 +28,20 @@ namespace aether::physics::euler{
         return V;
     }
 
+    AETHER_INLINE prims flux_from_prim_cell(prims &W, const double gamma){
+        prims F;
+        double inv_gm1 = 1.0/(gamma-1.0);
+        const double v2 = W.vx*W.vx + W.vy*W.vy + W.vz*W.vz;
+        const double E  = W.p * inv_gm1 + 0.5 * W.rho * v2;
+
+        F.rho = W.rho * W.vx;
+        F.vx  = W.rho * W.vx * W.vx + W.p;
+        F.vy  = W.rho * W.vx * W.vy;
+        F.vz  = W.rho * W.vx * W.vz;
+        F.p   = W.vx * (E + W.p); 
+        return F;
+    }
+
     void cons_to_prims_domain(aether::core::Simulation &sim);
 
     void prims_to_cons_domain(aether::core::Simulation &sim);

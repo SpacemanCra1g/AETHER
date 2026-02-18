@@ -47,6 +47,26 @@ namespace aether::core{
             CharView chars;
             eigenvec_view eigs;
         };
+        
+        struct CTU_view{
+            FaceArrayView x_flux_left_view;
+            FaceArrayView x_flux_right_view;
+            FaceArrayView x_flux_view;
+
+            FaceArrayView y_flux_left_view;
+            FaceArrayView y_flux_right_view;
+            FaceArrayView y_flux_view;
+
+            FaceArrayView z_flux_left_view;
+            FaceArrayView z_flux_right_view;
+            FaceArrayView z_flux_view;
+
+        };
+        struct CTU_buffer{
+            [[nodiscard]] AETHER_INLINE CTU_view view(){
+            return{};
+            }
+        };
 
         // Compile time known numvar parameter 
         static constexpr int numvar = aether::phys_ct::numvar;
@@ -71,6 +91,7 @@ namespace aether::core{
         FaceArraySoA flux_x_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 1> sweeps;
+        CTU_buffer ctu_buff;
 
         SimulationD() = default;
 
@@ -89,6 +110,7 @@ namespace aether::core{
         , flux_x_container(flux_x_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x})
+        , ctu_buff()
         {}
         
 
@@ -150,6 +172,51 @@ namespace aether::core{
     struct SimulationD<2>{
         // ---------- Sub-structs, containing Time, Grid config, -----------------
         // ---------- and a snapshot only 'view' object, passed by value ----------
+        
+        struct CTU_view{
+            FaceArrayView x_flux_left_view;
+            FaceArrayView x_flux_right_view;
+            FaceArrayView x_flux_view;
+
+            FaceArrayView y_flux_left_view;
+            FaceArrayView y_flux_right_view;
+            FaceArrayView y_flux_view;
+
+        };
+
+        struct CTU_buffer{
+            FaceArraySoA x_flux_left;
+            FaceArraySoA x_flux_right;
+            FaceArraySoA x_flux;
+
+            FaceArraySoA y_flux_left;
+            FaceArraySoA y_flux_right;
+            FaceArraySoA y_flux;
+
+            CTU_buffer() = default;
+
+            CTU_buffer(FaceGridX x_ext, FaceGridY y_ext, Quadrature quad)
+            : x_flux_left(x_ext,quad)
+            , x_flux_right(x_ext,quad)
+            , x_flux(x_ext,quad)
+            , y_flux_left(y_ext,quad)
+            , y_flux_right(y_ext,quad)
+            , y_flux(y_ext,quad)
+            {}
+
+            [[nodiscard]] AETHER_INLINE CTU_view view(){
+                return {
+                  x_flux_left.view()
+                , x_flux_right.view()
+                , x_flux.view()
+                , y_flux_left.view()
+                , y_flux_right.view()
+                , y_flux.view()
+                };
+
+            }
+        };
+        
         struct Time{
             double dt{0.0}, t_start{0.0}, t_end{0.0};
             double t{0.0}, cfl{0.0};
@@ -187,6 +254,7 @@ namespace aether::core{
         Config cfg;
         Time time;
         Grid grid;
+        
         // Declaring domain containers
         CellsSoA prims_container;
         CellsSoA cons_container;
@@ -209,6 +277,8 @@ namespace aether::core{
         eigenvectors char_eigs;
         std::array<sweep_dir, 2> sweeps;
 
+        CTU_buffer ctu_buff;
+
         SimulationD() = default;
 
         // Constructor builds the simulation struct
@@ -230,6 +300,7 @@ namespace aether::core{
         , flux_y_container(flux_y_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x,sweep_dir::y})
+        , ctu_buff(flux_x_ext, flux_y_ext, quad)
         {}
         
 
@@ -285,8 +356,6 @@ namespace aether::core{
             t.RK_stage = 0;
             return t;
         }
-
-      
     };
 
     // 3 Dimensional template for Simulation struct
@@ -328,6 +397,63 @@ namespace aether::core{
             eigenvec_view eigs;
         };
 
+        struct CTU_view{
+            FaceArrayView x_flux_left_view;
+            FaceArrayView x_flux_right_view;
+            FaceArrayView x_flux_view;
+
+            FaceArrayView y_flux_left_view;
+            FaceArrayView y_flux_right_view;
+            FaceArrayView y_flux_view;
+
+            FaceArrayView z_flux_left_view;
+            FaceArrayView z_flux_right_view;
+            FaceArrayView z_flux_view;
+        };
+
+        struct CTU_buffer{
+            FaceArraySoA x_flux_left;
+            FaceArraySoA x_flux_right;
+            FaceArraySoA x_flux;
+
+            FaceArraySoA y_flux_left;
+            FaceArraySoA y_flux_right;
+            FaceArraySoA y_flux;
+
+            FaceArraySoA z_flux_left;
+            FaceArraySoA z_flux_right;
+            FaceArraySoA z_flux;            
+
+            CTU_buffer() = default;
+
+            CTU_buffer(FaceGridX x_ext, FaceGridY y_ext, FaceGridZ z_ext, Quadrature quad)
+            : x_flux_left(x_ext,quad)
+            , x_flux_right(x_ext,quad)
+            , x_flux(x_ext,quad)
+            , y_flux_left(y_ext,quad)
+            , y_flux_right(y_ext,quad)
+            , y_flux(y_ext,quad)
+            , z_flux_left(z_ext,quad)
+            , z_flux_right(z_ext,quad)
+            , z_flux(z_ext,quad)
+            {}
+
+            [[nodiscard]] AETHER_INLINE CTU_view view(){
+                return {
+                  x_flux_left.view()
+                , x_flux_right.view()
+                , x_flux.view()
+                , y_flux_left.view()
+                , y_flux_right.view()
+                , y_flux.view()
+                , z_flux_left.view()
+                , z_flux_right.view()
+                , z_flux.view()
+                };
+
+            }
+        };
+
         // Compile time known numvar parameter 
         static constexpr int numvar = aether::phys_ct::numvar;
 
@@ -361,6 +487,7 @@ namespace aether::core{
         FaceArraySoA flux_z_container;
         eigenvectors char_eigs;
         std::array<sweep_dir, 3> sweeps;
+        CTU_buffer ctu_buff;
         
         
         SimulationD() = default;
@@ -387,6 +514,7 @@ namespace aether::core{
         , flux_z_container(flux_z_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x,sweep_dir::y,sweep_dir::z})
+        , ctu_buff(flux_x_ext, flux_y_ext, flux_z_ext, quad)
         {}
         
 

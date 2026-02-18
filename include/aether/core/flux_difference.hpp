@@ -1,3 +1,4 @@
+#pragma once
 #include "aether/physics/counts.hpp"
 #include <aether/core/simulation.hpp>
 #include <aether/core/views.hpp>

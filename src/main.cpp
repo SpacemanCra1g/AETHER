@@ -9,6 +9,7 @@
 #include <aether/core/SpaceDispatch.hpp>
 #include <aether/core/RiemannDispatch.hpp>
 #include <aether/core/flux_difference.hpp>
+#include <aether/core/CTU/ctu_total_correction.hpp>
 #include <omp.h>
 int main(){
   using namespace aether::core; {
@@ -43,7 +44,9 @@ int main(){
     std::cout << "The time step is " << sim.time.dt << " The current time is " << sim.time.t << "\n";
 
     Space_solve(sim);
-    Riemann_dispatch(sim, sim.grid.gamma);
+    CTU_correction(sim);
+
+    Riemann_dispatch(sim,View);
 
     flux_diff_sweep(View.prim, sim);
     axpy(sim.cons_container, -1.0, sim.prims_container);
