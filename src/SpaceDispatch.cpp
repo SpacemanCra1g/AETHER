@@ -17,13 +17,16 @@ namespace aether::core{
     const int ny = ext.ny;
     const int nz = ext.nz;
 
-    int i0 = 0,  i1 = nx;
+    int i0 = -1,  i1 = nx+1;
     int j0 = 0,  j1 = ny;
     int k0 = 0,  k1 = nz;
 
-    if constexpr (dir == sweep_dir::x) { i0 = -1; i1 = nx + 1; }
-    if constexpr (dir == sweep_dir::y) { j0 = -1; j1 = ny + 1; }
-    if constexpr (dir == sweep_dir::z) { k0 = -1; k1 = nz + 1; }
+    if constexpr (AETHER_DIM >= 2 ) {j0--;  j1++;}
+    if constexpr (AETHER_DIM == 3 ) {k0--;  k1++;}
+
+    // if constexpr (dir == sweep_dir::x) { i0 = -1; i1 = nx + 1; }
+    // if constexpr (dir == sweep_dir::y) { j0 = -1; j1 = ny + 1; }
+    // if constexpr (dir == sweep_dir::z) { k0 = -1; k1 = nz + 1; }
 
     double* AETHER_RESTRICT* prim_comp = view.prim.comp.data();
 

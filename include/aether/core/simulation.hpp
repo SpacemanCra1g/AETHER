@@ -184,36 +184,9 @@ namespace aether::core{
 
         };
 
-        struct CTU_buffer{
-            FaceArraySoA x_flux_left;
-            FaceArraySoA x_flux_right;
-            FaceArraySoA x_flux;
-
-            FaceArraySoA y_flux_left;
-            FaceArraySoA y_flux_right;
-            FaceArraySoA y_flux;
-
-            CTU_buffer() = default;
-
-            CTU_buffer(FaceGridX x_ext, FaceGridY y_ext, Quadrature quad)
-            : x_flux_left(x_ext,quad)
-            , x_flux_right(x_ext,quad)
-            , x_flux(x_ext,quad)
-            , y_flux_left(y_ext,quad)
-            , y_flux_right(y_ext,quad)
-            , y_flux(y_ext,quad)
-            {}
-
+            struct CTU_buffer{
             [[nodiscard]] AETHER_INLINE CTU_view view(){
-                return {
-                  x_flux_left.view()
-                , x_flux_right.view()
-                , x_flux.view()
-                , y_flux_left.view()
-                , y_flux_right.view()
-                , y_flux.view()
-                };
-
+            return{};
             }
         };
         
@@ -300,7 +273,7 @@ namespace aether::core{
         , flux_y_container(flux_y_ext, quad)
         , char_eigs(prims_container.size_flat())
         , sweeps({sweep_dir::x,sweep_dir::y})
-        , ctu_buff(flux_x_ext, flux_y_ext, quad)
+        , ctu_buff()
         {}
         
 

@@ -11,7 +11,10 @@
 #include <aether/core/flux_difference.hpp>
 #include <aether/core/CTU/ctu_total_correction.hpp>
 #include <omp.h>
+#include <cfenv>
+
 int main(){
+  feenableexcept(FE_INVALID);
   using namespace aether::core; {
 
   Config cfg; 
@@ -44,7 +47,7 @@ int main(){
     std::cout << "The time step is " << sim.time.dt << " The current time is " << sim.time.t << "\n";
 
     Space_solve(sim);
-    CTU_correction(sim);
+    // CTU_correction(sim);
 
     Riemann_dispatch(sim,View);
 

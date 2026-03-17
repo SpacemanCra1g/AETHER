@@ -54,7 +54,7 @@ struct CellsSoAT {
     // ---------- Constructor creates Extents struct and ----------
     // ---------- Allocates the flat array comp[NumberOfVariables][Total_Cells_in_T_Domain] ----------
     CellsSoAT(int nx, int ny, int nz, int ng) : ext(nx,ny,nz,ng){
-        const std::size_t N = size_t(ext.Nx) * ext.Ny * ext.Nz; 
+        const std::size_t N = std::size_t(ext.Nx) * ext.Ny * ext.Nz; 
         for (int c = 0; c < NCOMP; ++c) comp[c].resize(N);
     }
 

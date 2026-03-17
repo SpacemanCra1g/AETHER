@@ -135,26 +135,39 @@ AETHER_INLINE void Riemann_sweep(Simulation& Sim, riemann_sweep_params<dir,V> pa
     auto view = Sim.view();
     auto ext  = view.prim.ext;
     const int nx = ext.nx, ny = ext.ny, nz = ext.nz;
-
+    
     // Loop bounds
-    int i0 = 0, i1 = nx;
+    int i0 = -1, i1 = nx+1;
     int j0 = 0, j1 = ny;
     int k0 = 0, k1 = nz;
 
-    if constexpr (dir == sweep_dir::x) { i0 = -1; }
-    if constexpr (dir == sweep_dir::y) { j0 = -1; }
-    if constexpr (dir == sweep_dir::z) { k0 = -1; }
+    if constexpr (AETHER_DIM >= 2) {
+        j0--;
+        j1++;
+    } if constexpr (AETHER_DIM==3) {
+        k0--;
+        k1++;
+    }
+    
+
+
+    if constexpr (dir == sweep_dir::x) { i0++;}
+    if constexpr (dir == sweep_dir::y) { j0++;}
+    if constexpr (dir == sweep_dir::z) { k0++;}
 
     auto& FR = params.flux_right;
     auto& FL = params.flux_left;
     auto& Flux = params.flux;
 
+    // This indexing is a little tricky. What I should be doing is finding the x-flux 
+    // for j \in [-1,ny+1] (inclusive) and i \in [-1/2,nx+1/2] (inclusive) 
+    // With symmetry for y and z flux. It may not look like that is what I'm doing, but I'm fairly sure
     #pragma omp for collapse(3) schedule(static) nowait
     for (int k = k0; k < k1; ++k)
     for (int j = j0; j < j1; ++j)
     for (int i = i0; i < i1; ++i) {
 
-        std::size_t interface_idx = params.flux_ext.index(i-i0, j-j0, k-k0);
+        std::size_t interface_idx = params.flux_ext.index(i, j, k);
 
         aether::phys::prims L{}, R{}, F{};
 
