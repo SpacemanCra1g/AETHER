@@ -382,6 +382,13 @@ namespace aether::core{
             FaceArrayView z_flux_left_view;
             FaceArrayView z_flux_right_view;
             FaceArrayView z_flux_view;
+
+            FaceArrayView x_left_backup;
+            FaceArrayView x_right_backup;
+            FaceArrayView y_left_backup;
+            FaceArrayView y_right_backup;
+            FaceArrayView z_left_backup;
+            FaceArrayView z_right_backup;
         };
 
         struct CTU_buffer{
@@ -397,6 +404,15 @@ namespace aether::core{
             FaceArraySoA z_flux_right;
             FaceArraySoA z_flux;            
 
+            FaceArraySoA x_left_og;
+            FaceArraySoA x_right_og;
+
+            FaceArraySoA y_left_og;
+            FaceArraySoA y_right_og;
+
+            FaceArraySoA z_left_og;
+            FaceArraySoA z_right_og;
+
             CTU_buffer() = default;
 
             CTU_buffer(FaceGridX x_ext, FaceGridY y_ext, FaceGridZ z_ext, Quadrature quad)
@@ -409,6 +425,12 @@ namespace aether::core{
             , z_flux_left(z_ext,quad)
             , z_flux_right(z_ext,quad)
             , z_flux(z_ext,quad)
+            , x_left_og(x_ext,quad)
+            , x_right_og(x_ext,quad)
+            , y_left_og(y_ext,quad)
+            , y_right_og(y_ext,quad)
+            , z_left_og(z_ext,quad)
+            , z_right_og(z_ext,quad)
             {}
 
             [[nodiscard]] AETHER_INLINE CTU_view view(){
@@ -422,6 +444,12 @@ namespace aether::core{
                 , z_flux_left.view()
                 , z_flux_right.view()
                 , z_flux.view()
+                , x_left_og.view()
+                , x_right_og.view()
+                , y_left_og.view()
+                , y_right_og.view()
+                , z_left_og.view()
+                , z_right_og.view()
                 };
 
             }

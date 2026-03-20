@@ -19,8 +19,8 @@ AETHER_INLINE void FOG_face_from_stencil(const Stencil1D<0, numvar, dir>& S,
         // Note the swapped indexing here (FR -> fidL) There is no good way to 
         // swap the reference frame (left from cell center or from interface frame of refference)
         // This is where I am choosing to do it I guess 
-        FR.comp[v][fidL] = q;
-        FL.comp[v][fidR] = q;
+        FR.comp[v][fidR] = q;
+        FL.comp[v][fidL] = q;
     }
 }
 }

@@ -40,9 +40,9 @@ AETHER_INLINE static void flux_sweep(CellsView &out, Flux &FW, Flux_ext &F_ext, 
         std::size_t cell = view.cons.ext.index(i,j,k);
         for (int var = 0; var < numvar; ++ var){
             if constexpr (dir == sweep_dir::x) {
-                out.comp[var][cell] = dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
+                out.comp[var][cell] = -dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
             } else{
-                out.comp[var][cell] += dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
+                out.comp[var][cell] += -dxt*(FW.comp[var][Flux_L] - FW.comp[var][Flux_R]);
             }
         }
     }}}

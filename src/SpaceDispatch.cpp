@@ -81,7 +81,7 @@ namespace aether::core{
 
             FOG_face_from_stencil<numvar, sweep_dir::y>(S, FL, FR, faceL, faceR);
         }
-        return;
+    return;
     }
 #endif
 

@@ -111,7 +111,6 @@ def assemble_field_1d(table: np.ndarray, var_col: int,
     for ii, v in zip(i, vals):
         y[ii - i_min] = v
 
-    # Trim ghosts: keep i in [0, nx_hdr-1]
     if trim_ghosts and (ng is not None) and (nx_hdr is not None):
         i0, i1 = 0, nx_hdr - 1
         si0 = max(i0 - i_min, 0)
@@ -161,13 +160,11 @@ def assemble_field_3d(table: np.ndarray, var_col: int,
     ny_tot = (j_max - j_min + 1)
     nz_tot = (k_max - k_min + 1)
 
-    # We'll store as V[k, j, i] (z, y, x) for easy slicing
     V = np.full((nz_tot, ny_tot, nx_tot), np.nan, dtype=float)
     for (ii, jj, kk), v in zip(ijk, vals):
         V[kk - k_min, jj - j_min, ii - i_min] = v
 
     if trim_ghosts and (ng is not None) and (nx_hdr is not None) and (ny_hdr is not None) and (nz_hdr is not None):
-        # keep i,j,k in [0..nx_hdr-1], [0..ny_hdr-1], [0..nz_hdr-1]
         i0, j0, k0 = 0, 0, 0
         i1, j1, k1 = nx_hdr - 1, ny_hdr - 1, nz_hdr - 1
 
@@ -193,10 +190,6 @@ def build_physical_axis_1d(n: int,
                            trim_ghosts: bool,
                            nx_hdr: Optional[int],
                            xr: Optional[Tuple[float, float]]):
-    """
-    Return x axis of length n in physical coordinates if possible.
-    Priority: coords file -> xrange -> indices.
-    """
     if coords_1d is not None and coords_1d.shape[1] >= 2:
         i = coords_1d[:, 0].astype(int)
         x = coords_1d[:, 1].astype(float)
@@ -219,8 +212,7 @@ def build_physical_axis_1d(n: int,
         xmin, xmax = xr
         if n > 1:
             return np.linspace(xmin, xmax, n), 'x'
-        else:
-            return np.array([0.5 * (xmin + xmax)]), 'x'
+        return np.array([0.5 * (xmin + xmax)]), 'x'
 
     return np.arange(n, dtype=float), 'i'
 
@@ -231,14 +223,6 @@ def build_physical_axes_2d(Z: np.ndarray,
                            nx_hdr: Optional[int], ny_hdr: Optional[int],
                            xr: Optional[Tuple[float, float]],
                            yr: Optional[Tuple[float, float]]):
-    """
-    Build (x_vec, y_vec, extent, (xlab, ylab)) for imshow and slicing.
-
-    Priority:
-      - coords file (i j x y): dense vectors for x and y if possible (structured grid assumption)
-      - xrange/yrange: uniform vectors
-      - else: index vectors
-    """
     ny, nx = Z.shape
 
     if coords_2d is not None and coords_2d.shape[1] >= 4:
@@ -297,12 +281,6 @@ def build_physical_axes_3d(V: np.ndarray,
                            xr: Optional[Tuple[float, float]],
                            yr: Optional[Tuple[float, float]],
                            zr: Optional[Tuple[float, float]]):
-    """
-    Build (x_vec, y_vec, z_vec, (xlab, ylab, zlab)).
-
-    coords_3d format expected: (i j k x y z).
-    Assumes structured grid: x depends on i, y on j, z on k.
-    """
     nz, ny, nx = V.shape
 
     if coords_3d is not None and coords_3d.shape[1] >= 6:
@@ -344,7 +322,6 @@ def build_physical_axes_3d(V: np.ndarray,
            np.all(np.isfinite(x_vec)) and np.all(np.isfinite(y_vec)) and np.all(np.isfinite(z_vec)):
             return x_vec, y_vec, z_vec, ('x', 'y', 'z')
 
-    # fallback to ranges or indices
     if xr is not None:
         x_vec = np.linspace(xr[0], xr[1], nx) if nx > 1 else np.array([0.5 * (xr[0] + xr[1])])
         xlab = 'x'
@@ -370,7 +347,6 @@ def build_physical_axes_3d(V: np.ndarray,
 
 
 def aspect_from_extent(extent):
-    # extent = (xmin, xmax, ymin, ymax)
     if extent is None:
         return 'auto'
     dx = extent[1] - extent[0]
@@ -391,17 +367,18 @@ def main():
                     help='Optional output image path (.png). Defaults next to snapshot (but script uses plt.show())')
     ap.add_argument('--title', type=str, default=None, help='Optional plot title')
 
-    # 2D slicing (legacy)
-    ap.add_argument('--slice-axis', choices=['x', 'y'], default=None,
-                    help='For 2D snapshots: plot a 1D slice along x or y instead of a 2D image.')
+    # Unified slicing
+    ap.add_argument('--slice-axis', choices=['x', 'y', 'z'], default=None,
+                    help='For 2D: plot a 1D slice along x or y. For 3D with --plane, plot a 1D slice along an axis lying in that plane.')
     ap.add_argument('--slice-index', type=int, default=None,
-                    help='2D: index of orthogonal direction for slicing (j for x-slice, i for y-slice). '
-                         'If omitted, uses the midpoint.')
+                    help='Index of the orthogonal coordinate to fix when plotting a 1D slice. '
+                         '2D examples: --slice-axis x => fixes j, --slice-axis y => fixes i. '
+                         '3D examples: --plane xy --slice-axis x => fixes y, '
+                         '--plane xz --slice-axis z => fixes x.')
     ap.add_argument('--slice-value', type=float, default=None,
-                    help='2D: physical coordinate for orthogonal slicing (y for x-slice, x for y-slice). '
-                         'Nearest slice is chosen. Requires --coords or --xrange/--yrange.')
+                    help='Physical value of the orthogonal coordinate to fix when plotting a 1D slice. '
+                         'Nearest slice is chosen. Requires --coords or the corresponding axis range.')
 
-    # Physical axis ranges (fallback when coords not available)
     ap.add_argument('--xrange', type=float, nargs=2, default=None, metavar=('XMIN', 'XMAX'),
                     help='Physical x-range when coords are not available (e.g. --xrange -1 1).')
     ap.add_argument('--yrange', type=float, nargs=2, default=None, metavar=('YMIN', 'YMAX'),
@@ -409,32 +386,19 @@ def main():
     ap.add_argument('--zrange', type=float, nargs=2, default=None, metavar=('ZMIN', 'ZMAX'),
                     help='Physical z-range when coords are not available (e.g. --zrange -1 1).')
 
-    # 3D plane + line slicing
     ap.add_argument('--plane', choices=['xy', 'xz', 'yz'], default=None,
-                    help='For 3D snapshots: choose a 2D slice plane (xy at fixed z, xz at fixed y, yz at fixed x). '
-                         'Default is xy.')
+                    help='For 3D snapshots: choose a 2D slice plane (xy at fixed z, xz at fixed y, yz at fixed x). Default is xy.')
     ap.add_argument('--plane-index', type=int, default=None,
-                    help='3D: index of the orthogonal coordinate for the plane (k for xy, j for xz, i for yz). '
-                         'If omitted, uses midpoint.')
+                    help='3D: index of the orthogonal coordinate for the plane (k for xy, j for xz, i for yz). If omitted, uses midpoint.')
     ap.add_argument('--plane-value', type=float, default=None,
                     help='3D: physical value of the orthogonal coordinate for the plane (z for xy, y for xz, x for yz). '
                          'Nearest slice is chosen. Requires coords or corresponding range.')
-
-    ap.add_argument('--line-axis', choices=['x', 'y', 'z'], default=None,
-                    help='For 3D plane slices: optionally extract a 1D line in the chosen plane along this axis.')
-    ap.add_argument('--line-index', type=int, default=None,
-                    help='3D: index for the remaining in-plane orthogonal coordinate when plotting a line. '
-                         'Example: plane=xy, line-axis=x -> line-index selects j (y-index).')
-    ap.add_argument('--line-value', type=float, default=None,
-                    help='3D: physical value for the remaining in-plane orthogonal coordinate when plotting a line. '
-                         'Requires coords or corresponding range.')
 
     args = ap.parse_args()
 
     table, hdr = load_snapshot_table(args.snapshot)
     dim = hdr.get('dim', None)
     if dim is None:
-        # Heuristic based on minimum index columns
         if table.shape[1] >= 4:
             dim = 3
         elif table.shape[1] >= 3:
@@ -509,8 +473,11 @@ def main():
 
         plt.figure()
 
-        # Optional 1D slice of 2D
         if args.slice_axis is not None:
+            if args.slice_axis == 'z':
+                print('[error] 2D: --slice-axis z is not valid for a 2D snapshot.', file=sys.stderr)
+                sys.exit(2)
+
             if args.slice_value is not None:
                 if (args.slice_axis == 'x') and (coords is None) and (yr is None):
                     print('[error] 2D: --slice-value with --slice-axis x requires --coords or --yrange.', file=sys.stderr)
@@ -520,7 +487,6 @@ def main():
                     sys.exit(2)
 
             if args.slice_axis == 'x':
-                # plot vs x at fixed j (fixed y)
                 if args.slice_value is not None:
                     j0 = nearest_index(y_vec, args.slice_value)
                 else:
@@ -535,7 +501,6 @@ def main():
                 plt.title(args.title if args.title else f"v{args.var} slice at {ylab}={y_val:.6g}")
 
             else:  # slice_axis == 'y'
-                # plot vs y at fixed i (fixed x)
                 if args.slice_value is not None:
                     i0 = nearest_index(x_vec, args.slice_value)
                 else:
@@ -565,8 +530,6 @@ def main():
     # ---------------- 3D ----------------
     elif dim == 3:
         V, _ = assemble_field_3d(table, var_col, args.trim_ghosts, ng, nx_hdr, ny_hdr, nz_hdr)
-        # V[k, j, i]
-        z_vec, y_vec, x_vec = None, None, None
 
         x_vec, y_vec, z_vec, (xlab, ylab, zlab) = build_physical_axes_3d(
             V=V,
@@ -580,13 +543,8 @@ def main():
             zr=zr
         )
 
-        # Choose plane
         plane = args.plane if args.plane is not None else 'xy'
 
-        # Determine fixed index for plane
-        # plane=xy -> fixed k (z)
-        # plane=xz -> fixed j (y)
-        # plane=yz -> fixed i (x)
         if args.plane_value is not None:
             if plane == 'xy':
                 if (coords is None) and (zr is None):
@@ -598,7 +556,7 @@ def main():
                     print('[error] 3D: --plane-value with plane=xz requires --coords or --yrange.', file=sys.stderr)
                     sys.exit(2)
                 fixed = nearest_index(y_vec, args.plane_value)
-            else:  # yz
+            else:
                 if (coords is None) and (xr is None):
                     print('[error] 3D: --plane-value with plane=yz requires --coords or --xrange.', file=sys.stderr)
                     sys.exit(2)
@@ -614,7 +572,6 @@ def main():
                 else:
                     fixed = V.shape[2] // 2
 
-        # Clamp fixed index
         if plane == 'xy':
             fixed = max(0, min(V.shape[0] - 1, fixed))
         elif plane == 'xz':
@@ -622,26 +579,21 @@ def main():
         else:
             fixed = max(0, min(V.shape[2] - 1, fixed))
 
-        # Extract plane data as a 2D array Z2 in (row, col) = (y, x) ordering for imshow
-        # and define the in-plane axes.
         if plane == 'xy':
-            # Z2[j, i] at fixed k
             Z2 = V[fixed, :, :]
-            ax_u, ax_v = x_vec, y_vec      # u=x (cols), v=y (rows)
+            ax_u, ax_v = x_vec, y_vec
             lab_u, lab_v = xlab, ylab
             fixed_lab = zlab
             fixed_val = float(z_vec[fixed])
             extent = (float(ax_u.min()), float(ax_u.max()), float(ax_v.min()), float(ax_v.max()))
         elif plane == 'xz':
-            # Z2[k, i] at fixed j  -> rows=z, cols=x
             Z2 = V[:, fixed, :]
             ax_u, ax_v = x_vec, z_vec
             lab_u, lab_v = xlab, zlab
             fixed_lab = ylab
             fixed_val = float(y_vec[fixed])
             extent = (float(ax_u.min()), float(ax_u.max()), float(ax_v.min()), float(ax_v.max()))
-        else:  # yz
-            # Z2[k, j] at fixed i -> rows=z, cols=y
+        else:
             Z2 = V[:, :, fixed]
             ax_u, ax_v = y_vec, z_vec
             lab_u, lab_v = ylab, zlab
@@ -651,37 +603,30 @@ def main():
 
         plt.figure()
 
-        # Optional: line in plane
-        if args.line_axis is not None:
-            line_axis = args.line_axis
+        if args.slice_axis is not None:
+            in_plane_axes = set(plane)
+            slice_axis = args.slice_axis
 
-            # Validate that requested line axis lies in the plane
-            in_plane_axes = set(plane)  # 'xy' => {'x','y'}
-            if line_axis not in in_plane_axes:
-                print(f"[error] 3D: --line-axis {line_axis} is not in plane {plane}.", file=sys.stderr)
-                print("        Valid choices: plane=xy -> line-axis x or y; plane=xz -> x or z; plane=yz -> y or z.", file=sys.stderr)
+            if slice_axis not in in_plane_axes:
+                print(f"[error] 3D: --slice-axis {slice_axis} is not in plane {plane}.", file=sys.stderr)
+                print("        Valid choices: plane=xy -> x or y; plane=xz -> x or z; plane=yz -> y or z.", file=sys.stderr)
                 sys.exit(2)
 
-            # The other in-plane axis (to fix)
-            other_axis = (in_plane_axes - {line_axis}).pop()
+            other_axis = (in_plane_axes - {slice_axis}).pop()
 
-            # Map axis vectors
             vec = {'x': x_vec, 'y': y_vec, 'z': z_vec}
             lab = {'x': xlab, 'y': ylab, 'z': zlab}
+            rng = {'x': xr, 'y': yr, 'z': zr}
 
-            # Choose index for "other_axis" within this plane
-            # If line_value provided: interpret as physical value of other_axis
-            if args.line_value is not None:
-                # require coords or relevant range for other_axis
-                need = {'x': xr, 'y': yr, 'z': zr}[other_axis]
-                if (coords is None) and (need is None):
-                    print(f"[error] 3D: --line-value requires --coords or corresponding range for axis '{other_axis}'.", file=sys.stderr)
+            if args.slice_value is not None:
+                if (coords is None) and (rng[other_axis] is None):
+                    print(f"[error] 3D: --slice-value requires --coords or corresponding range for axis '{other_axis}'.", file=sys.stderr)
                     sys.exit(2)
-                other_idx = nearest_index(vec[other_axis], args.line_value)
+                other_idx = nearest_index(vec[other_axis], args.slice_value)
             else:
-                other_idx = args.line_index
-                if other_idx is None:
-                    # midpoint
+                if args.slice_index is not None:
+                    other_idx = args.slice_index
+                else:
                     if other_axis == 'x':
                         other_idx = V.shape[2] // 2
                     elif other_axis == 'y':
@@ -689,67 +634,64 @@ def main():
                     else:
                         other_idx = V.shape[0] // 2
 
-            # Clamp other_idx based on that axis' length
             other_idx = max(0, min(len(vec[other_axis]) - 1, other_idx))
 
-            # Now extract the line, depending on plane + line_axis
             if plane == 'xy':
-                # Z2 is (y, x)
-                if line_axis == 'x':
-                    # x-line at fixed y (j=other_idx)
+                # Z2[y, x]
+                if slice_axis == 'x':
                     y_idx = other_idx
                     line = Z2[y_idx, :]
                     plt.plot(x_vec, line)
                     plt.xlabel(xlab)
                     plt.ylabel(f'v{args.var}')
                     other_val = float(y_vec[y_idx])
-                    title = f"v{args.var} line in {plane} at {fixed_lab}={fixed_val:.6g}, {ylab}={other_val:.6g}"
-                else:  # line_axis == 'y'
+                    title = f"v{args.var} slice in {plane} at {fixed_lab}={fixed_val:.6g}, {ylab}={other_val:.6g}"
+                else:
                     x_idx = other_idx
                     line = Z2[:, x_idx]
                     plt.plot(y_vec, line)
                     plt.xlabel(ylab)
                     plt.ylabel(f'v{args.var}')
                     other_val = float(x_vec[x_idx])
-                    title = f"v{args.var} line in {plane} at {fixed_lab}={fixed_val:.6g}, {xlab}={other_val:.6g}"
+                    title = f"v{args.var} slice in {plane} at {fixed_lab}={fixed_val:.6g}, {xlab}={other_val:.6g}"
 
             elif plane == 'xz':
-                # Z2 is (z, x)
-                if line_axis == 'x':
+                # Z2[z, x]
+                if slice_axis == 'x':
                     z_idx = other_idx
                     line = Z2[z_idx, :]
                     plt.plot(x_vec, line)
                     plt.xlabel(xlab)
                     plt.ylabel(f'v{args.var}')
                     other_val = float(z_vec[z_idx])
-                    title = f"v{args.var} line in {plane} at {fixed_lab}={fixed_val:.6g}, {zlab}={other_val:.6g}"
-                else:  # line_axis == 'z'
+                    title = f"v{args.var} slice in {plane} at {fixed_lab}={fixed_val:.6g}, {zlab}={other_val:.6g}"
+                else:
                     x_idx = other_idx
                     line = Z2[:, x_idx]
                     plt.plot(z_vec, line)
                     plt.xlabel(zlab)
                     plt.ylabel(f'v{args.var}')
                     other_val = float(x_vec[x_idx])
-                    title = f"v{args.var} line in {plane} at {fixed_lab}={fixed_val:.6g}, {xlab}={other_val:.6g}"
+                    title = f"v{args.var} slice in {plane} at {fixed_lab}={fixed_val:.6g}, {xlab}={other_val:.6g}"
 
-            else:  # plane == 'yz'
-                # Z2 is (z, y)
-                if line_axis == 'y':
+            else:
+                # Z2[z, y]
+                if slice_axis == 'y':
                     z_idx = other_idx
                     line = Z2[z_idx, :]
                     plt.plot(y_vec, line)
                     plt.xlabel(ylab)
                     plt.ylabel(f'v{args.var}')
                     other_val = float(z_vec[z_idx])
-                    title = f"v{args.var} line in {plane} at {fixed_lab}={fixed_val:.6g}, {zlab}={other_val:.6g}"
-                else:  # line_axis == 'z'
+                    title = f"v{args.var} slice in {plane} at {fixed_lab}={fixed_val:.6g}, {zlab}={other_val:.6g}"
+                else:
                     y_idx = other_idx
                     line = Z2[:, y_idx]
                     plt.plot(z_vec, line)
                     plt.xlabel(zlab)
                     plt.ylabel(f'v{args.var}')
                     other_val = float(y_vec[y_idx])
-                    title = f"v{args.var} line in {plane} at {fixed_lab}={fixed_val:.6g}, {ylab}={other_val:.6g}"
+                    title = f"v{args.var} slice in {plane} at {fixed_lab}={fixed_val:.6g}, {ylab}={other_val:.6g}"
 
             if args.title:
                 plt.title(args.title)
@@ -757,11 +699,9 @@ def main():
                 plt.title(title)
 
         else:
-            # 2D plane image
             im = plt.imshow(Z2, origin='lower',
                             extent=extent,
                             aspect=aspect_from_extent(extent))
-
             plt.colorbar(im, label=f'v{args.var}')
             plt.xlabel(lab_u)
             plt.ylabel(lab_v)
@@ -773,7 +713,6 @@ def main():
             else:
                 plt.title(f"v{args.var}  {plane}@{fixed_lab}={fixed_val:.6g}")
 
-    # --------------- finalize ---------------
     outpath = args.output if args.output else os.path.splitext(args.snapshot)[0] + f"_v{args.var}.png"
     plt.tight_layout()
     # plt.savefig(outpath, dpi=150)
@@ -783,4 +722,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

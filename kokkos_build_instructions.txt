@@ -1,0 +1,15 @@
+I haven't tested or refinded this just yet,
+but these are the build instructions for
+setting up kokkos on a new machine
+
+# once per machine
+git clone https://github.com/kokkos/kokkos.git
+cmake -B build-kokkos -S kokkos \
+  -DCMAKE_INSTALL_PREFIX=$HOME/local/kokkos-cpu \ (or whatever dir)
+  -DKokkos_ENABLE_SERIAL=ON \ (these are serial and CPU multi-thread parameters)
+  -DKokkos_ENABLE_OPENMP=ON
+cmake --build build-kokkos -j
+cmake --install build-kokkos
+
+Then for AETHER
+cmake -B build -S . -DKokkos_ROOT=$HOME/local/kokkos-cpu

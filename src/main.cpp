@@ -14,7 +14,7 @@
 #include <cfenv>
 
 int main(){
-  feenableexcept(FE_INVALID);
+  // feenableexcept(FE_INVALID);
   using namespace aether::core; {
 
   Config cfg; 
@@ -47,7 +47,7 @@ int main(){
     std::cout << "The time step is " << sim.time.dt << " The current time is " << sim.time.t << "\n";
 
     Space_solve(sim);
-    // CTU_correction(sim);
+    CTU_correction(sim);
 
     Riemann_dispatch(sim,View);
 
@@ -55,8 +55,9 @@ int main(){
     axpy(sim.cons_container, -1.0, sim.prims_container);
     boundary_conditions(sim,View.cons);
     aether::phys::cons_to_prims_domain(sim);
-  } while (sim.time.t < sim.time.t_end);
+  } while (sim.time.t < sim.time.t_end );
     // aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
+    
   std::cout << "The final time is " << sim.time.t << "\n";
   aether::io::snapshot_request snap;
   snap.formats.push_back(aether::io::output_format::plain_txt);
