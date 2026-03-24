@@ -1,136 +1,67 @@
-#include <aether/core/space_solvers/fog.hpp>
-#include <aether/core/stencil_templates.hpp>
+#include <Kokkos_Core.hpp>
+
 #include <aether/core/SpaceDispatch.hpp>
+#include <aether/core/Kokkos_loopBounds.hpp>
+#include <aether/core/enums.hpp>
+#include <aether/core/simulation.hpp>
+#include <aether/physics/counts.hpp>
+
 #include <stdexcept>
 
+namespace loop = aether::loops;
+namespace aether::core {
 
-namespace aether::core{
-
-    template<sweep_dir dir>
-    AETHER_INLINE void FOG_sweep(Simulation& Sim) noexcept {
+template<sweep_dir dir, class Sim>
+AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
     constexpr int numvar = aether::phys_ct::numvar;
+    constexpr int i0 = (dir == sweep_dir::x) ? 1 : 0;
+    constexpr int j0 = (dir == sweep_dir::y) ? 1 : 0;
+    constexpr int k0 = (dir == sweep_dir::z) ? 1 : 0;
 
-    auto view = Sim.view();
-    const auto ext = view.prim.ext;
+    auto view = sim.view();
+    auto prim = view.prim;
+    const int quad = view.quad;
 
-    const int nx = ext.nx;
-    const int ny = ext.ny;
-    const int nz = ext.nz;
+    auto FL = [&]() {
+        if constexpr (dir == sweep_dir::x) return view.fxL;
+        else if constexpr (dir == sweep_dir::y) return view.fyL;
+        else return view.fzL;
+    }();
 
-    int i0 = -1,  i1 = nx+1;
-    int j0 = 0,  j1 = ny;
-    int k0 = 0,  k1 = nz;
+    auto FR = [&]() {
+        if constexpr (dir == sweep_dir::x) return view.fxR;
+        else if constexpr (dir == sweep_dir::y) return view.fyR;
+        else return view.fzR;
+    }();
 
-    if constexpr (AETHER_DIM >= 2 ) {j0--;  j1++;}
-    if constexpr (AETHER_DIM == 3 ) {k0--;  k1++;}
-
-    // if constexpr (dir == sweep_dir::x) { i0 = -1; i1 = nx + 1; }
-    // if constexpr (dir == sweep_dir::y) { j0 = -1; j1 = ny + 1; }
-    // if constexpr (dir == sweep_dir::z) { k0 = -1; k1 = nz + 1; }
-
-    double* AETHER_RESTRICT* prim_comp = view.prim.comp.data();
-
-    std::ptrdiff_t sx = static_cast<std::ptrdiff_t>(ext.sx);
-    std::ptrdiff_t sy = static_cast<std::ptrdiff_t>(ext.sy);
-    std::ptrdiff_t sz = static_cast<std::ptrdiff_t>(ext.sz);
-
-    std::size_t cell = 0;
-    std::size_t faceR = 0;
-    std::size_t faceL = 0;
-
-    if constexpr (dir == sweep_dir::x) {
-        auto& FL = view.x_flux_left;
-        auto& FR = view.x_flux_right;
-
-        #pragma omp for collapse(3) schedule(static) nowait
-        for (int k = k0; k < k1; ++k)
-        for (int j = j0; j < j1; ++j)
-        for (int i = i0; i < i1; ++i) {
-            cell = ext.index(i, j, k);
-            faceR = Sim.flux_x_ext.index(i, j, k);
-            faceL = Sim.flux_x_ext.index(i+1, j, k);
-
-            CellAccessor<numvar> A{prim_comp, cell, sx, sy, sz};
-            Stencil1D<0, numvar, sweep_dir::x> S{A};
-
-            FOG_face_from_stencil<numvar, sweep_dir::x>(S, FL, FR, faceL,faceR);
+    Kokkos::parallel_for(
+        "FOG_sweep",
+        loop::cells_full(sim),
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            for (int c = 0; c < numvar; ++c) {
+                const double u = prim(c, k, j, i);
+                for (int q = 0; q < quad; ++q) {
+                    FR(c, q, k,     j,     i    ) = u;
+                    FL(c, q, k + k0, j + j0, i + i0) = u;
+                }
+            }
         }
-    return;
-    }
-// This needs refactoring for multi-D problems
-#if AETHER_DIM > 1
-    if constexpr (dir == sweep_dir::y) {
-        auto& FL = view.y_flux_left;
-        auto& FR = view.y_flux_right;
+    );
+}
 
-        #pragma omp for collapse(3) schedule(static) nowait
-        for (int k = k0; k < k1; ++k)
-        for (int j = j0; j < j1; ++j)
-        for (int i = i0; i < i1; ++i) {
-
-            cell  = ext.index(i, j, k);
-
-            // Mirror x-logic:
-            // j runs [-1, ny] because j0=-1, j1=ny+1
-            // faceR at (j), faceL at (j+1)
-            faceR = Sim.flux_y_ext.index(i, j,   k);
-            faceL = Sim.flux_y_ext.index(i, j+1, k);
-
-            CellAccessor<numvar> A{prim_comp, cell, sx, sy, sz};
-            Stencil1D<0, numvar, sweep_dir::y> S{A};
-
-            FOG_face_from_stencil<numvar, sweep_dir::y>(S, FL, FR, faceL, faceR);
-        }
-    return;
-    }
-#endif
-
-#if AETHER_DIM > 2
-    if constexpr (dir == sweep_dir::z) {
-        auto& FL = view.z_flux_left;
-        auto& FR = view.z_flux_right;
-
-        #pragma omp for collapse(3) schedule(static) nowait
-        for (int k = k0; k < k1; ++k)
-        for (int j = j0; j < j1; ++j)
-        for (int i = i0; i < i1; ++i) {
-
-            cell  = ext.index(i, j, k);
-
-            // Mirror x-logic:
-            // k runs [-1, nz] because k0=-1, k1=nz+1
-            // faceR at (k), faceL at (k+1)
-            faceR = Sim.flux_z_ext.index(i, j, k);
-            faceL = Sim.flux_z_ext.index(i, j, k+1);
-
-            CellAccessor<numvar> A{prim_comp, cell, sx, sy, sz};
-            Stencil1D<0, numvar, sweep_dir::z> S{A};
-
-            FOG_face_from_stencil<numvar, sweep_dir::z>(S, FL, FR, faceL, faceR);
-        }
-        return;
-    }
-#endif
-
-    }
-
-//---------- Space solver dispatcher ----------
+// ---------- Space solver dispatcher ----------
 
 void Space_solve(Simulation& Sim) {
     switch (Sim.cfg.solve) {
-        case solver::fog: {
-            #pragma omp parallel default(none) shared(Sim)
-            {
-                    FOG_sweep<sweep_dir::x>(Sim);
-                #if AETHER_DIM > 1
-                    FOG_sweep<sweep_dir::y>(Sim);
-                #endif
-                #if AETHER_DIM > 2
-                    FOG_sweep<sweep_dir::z>(Sim);
-                #endif
+        case solver::fog:
+            FOG_sweep<sweep_dir::x>(Sim);
+            if constexpr (AETHER_DIM > 1) {
+                FOG_sweep<sweep_dir::y>(Sim);
+            }
+            if constexpr (AETHER_DIM > 2) {
+                FOG_sweep<sweep_dir::z>(Sim);
             }
             break;
-        }
 
         default:
             throw std::runtime_error("Space_solve: unknown space solver");

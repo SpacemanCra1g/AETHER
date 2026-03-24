@@ -7,7 +7,10 @@ add_library(aether_phys_euler STATIC
 )
 
 # Share warnings/flags and headers
-target_link_libraries(aether_phys_euler PRIVATE aether_compile_options)
+target_link_libraries(aether_phys_euler 
+  PRIVATE aether_compile_options 
+  PUBLIC Kokkos::kokkos
+)
 
 # Public headers live at <repo>/include so consumers see aether/...
 target_include_directories(aether_phys_euler

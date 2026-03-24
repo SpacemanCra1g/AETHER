@@ -15,7 +15,7 @@ if(_link_result)
   message(STATUS "Could not create symlink for compile_commands.json (likely Windows); configure clangd to use the build dir instead.")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   # for clangd/VSCode
 
@@ -43,14 +43,11 @@ if(ENABLE_CUDA)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 endif()
 
-# ---- Map options to 0/1 ints for headers ------------------------------------
-
 # ---- Default build type ------------------------------------------------------
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "No build type selected, defaulting to Release")
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 
-  # Allow IDEs like VSCode/CMake Tools to still offer dropdown choices
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
                "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 endif()
@@ -77,7 +74,7 @@ if(AETHER_FORCE_DIM)
 endif()
 if(AETHER_FORCE_DIM STREQUAL 1)
   set(AETHER_FORCED_DIM_INT 0)
-  set(AETHER_FORCE_DIM "0")  
+  set(AETHER_FORCE_DIM "0")
 endif()
 
 # Physics selection
@@ -111,9 +108,28 @@ set(AETHER_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(AETHER_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(AETHER_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 
+# ---- Kokkos backend selection ------------------------------------------------
+set(Kokkos_ENABLE_SERIAL OFF CACHE BOOL "" FORCE)
+set(Kokkos_ENABLE_OPENMP OFF CACHE BOOL "" FORCE)
+set(Kokkos_ENABLE_CUDA   OFF CACHE BOOL "" FORCE)
+
+if(ENABLE_CUDA)
+  set(Kokkos_ENABLE_CUDA ON CACHE BOOL "" FORCE)
+elseif(ENABLE_OPENMP)
+  set(Kokkos_ENABLE_OPENMP ON CACHE BOOL "" FORCE)
+else()
+  set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "" FORCE)
+endif()
+
+# Helpful defaults for embedded Kokkos builds
+set(Kokkos_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(Kokkos_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(Kokkos_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+
+# ---- Kokkos submodule --------------------------------------------------------
+add_subdirectory(${CMAKE_SOURCE_DIR}/tpls/kokkos)
+
 # ---- Generate build-dir header ----------------------------------------------
-#   source:  <proj_src>/include/aether/core/config_build.hpp.in.cmake
-#   output:  <build>/generated/aether/core/config_build.hpp
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/aether/core/config_build.hpp.in.cmake
   ${CMAKE_BINARY_DIR}/generated/aether/core/config_build.hpp
@@ -126,9 +142,7 @@ add_library(aether_compile_options INTERFACE)
 # Silence "unknown pragma" only when OpenMP is OFF
 if(NOT ENABLE_OPENMP)
   target_compile_options(aether_compile_options INTERFACE
-    # GCC / Clang / AppleClang
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unknown-pragmas>
-    # MSVC (and clang-cl when reported as MSVC)
     $<$<CXX_COMPILER_ID:MSVC>:/wd4068>
   )
 endif()
@@ -140,7 +154,7 @@ else()
 endif()
 
 # ---- Sanitizers helper (list-based; INTERFACE-safe) --------------------------
-set(AETHER_SAN_LIST address undefined)  # list of sanitizers
+set(AETHER_SAN_LIST address undefined)
 
 function(aether_enable_sanitizers_for TARGET_NAME)
   if(NOT ENABLE_SANITIZERS OR MSVC)
@@ -181,17 +195,14 @@ endfunction()
 # ---- Core library target -----------------------------------------------------
 add_library(aether_core)
 
-# Gather sources (no CONFIGURE_DEPENDS to avoid constant reconfigures)
 file(GLOB_RECURSE AETHER_CORE_CPP
      "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
-# Exclude physics subdir and editor/build dirs
 list(FILTER AETHER_CORE_CPP EXCLUDE REGEX ".*/src[\\/]physics/.*")
 list(FILTER AETHER_CORE_CPP EXCLUDE REGEX ".*/(\\.git|\\.vscode|\\.idea|build)/.*")
 
 target_sources(aether_core PRIVATE ${AETHER_CORE_CPP})
 
-# Public headers (generated marked as SYSTEM to reduce warning noise)
 target_include_directories(aether_core
   PUBLIC
     ${CMAKE_SOURCE_DIR}/include
@@ -199,22 +210,26 @@ target_include_directories(aether_core
     ${CMAKE_BINARY_DIR}/generated
 )
 
-# Apply shared compile options
-target_link_libraries(aether_core PRIVATE aether_compile_options)
+target_link_libraries(aether_core
+  PRIVATE
+    aether_compile_options
+  PUBLIC
+    Kokkos::kokkos
+)
 
-# OpenMP (CPU parallel loops)
+# OpenMP for legacy non-Kokkos code paths
 if(ENABLE_OPENMP)
   find_package(OpenMP REQUIRED)
   target_link_libraries(aether_core PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-# MPI (off by default)
+# MPI
 if(ENABLE_MPI)
   find_package(MPI REQUIRED)
   target_link_libraries(aether_core PUBLIC MPI::MPI_CXX)
 endif()
 
-# CUDA sources only when enabled (no CONFIGURE_DEPENDS)
+# CUDA sources only when enabled
 if(ENABLE_CUDA)
   file(GLOB_RECURSE AETHER_CORE_CU
        "${CMAKE_SOURCE_DIR}/src/*.cu")
@@ -232,9 +247,8 @@ add_executable(aether.ex ${CMAKE_SOURCE_DIR}/src/main.cpp)
 target_link_libraries(aether.ex PRIVATE aether_core aether_phys)
 
 # ---- Enable sanitizers on linkable targets ----------------------------------
-# (Key: the final link of aether.ex must carry -fsanitize=... )
 aether_enable_sanitizers_for(aether_core)
-aether_enable_sanitizers_for(aether_phys)  # INTERFACE-safe
+aether_enable_sanitizers_for(aether_phys)
 aether_enable_sanitizers_for(aether.ex)
 
 # ---- Tests (optional) --------------------------------------------------------
@@ -258,5 +272,5 @@ else()
   message(STATUS "IPO/LTO not supported: ${AETHER_IPO_MSG}")
 endif()
 
-# ---- Release-only C++ flags (directory-scoped; safe for INTERFACE libs) -----
+# ---- Release-only C++ flags --------------------------------------------------
 add_compile_options($<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:CXX>>:-O3 -fstrict-aliasing>)

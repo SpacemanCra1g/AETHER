@@ -4,7 +4,10 @@ add_library(aether_phys_mhd STATIC
   # add more MHD-specific .cpp here
 )
 
-target_link_libraries(aether_phys_mhd PRIVATE aether_compile_options)
+target_link_libraries(aether_phys_mhd 
+  PRIVATE aether_compile_options
+  PUBLIC Kokkos::kokkos
+)
 
 target_include_directories(aether_phys_mhd
   PUBLIC ${PROJECT_SOURCE_DIR}/include

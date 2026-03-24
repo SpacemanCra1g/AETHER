@@ -13,29 +13,29 @@
 namespace aether::core {
 
 struct substage_container{
-    std::vector<CellsSoA> buffer;
-    CellsView Cons_point;
+    // std::vector<CellsSoA> buffer;
+    // CellsView Cons_point;
 
-    void init(Simulation &sim){
-        auto ext = &sim.prims_container.ext;
-        switch(sim.cfg.time_step){
-            case time_stepper::char_trace:
-                buffer.clear();
-                buffer.reserve(1);
-                buffer.emplace_back(CellsSoA(ext->nx,ext->ny,ext->nz,ext->ng));
-                Cons_point.ext = buffer[0].ext;
-                for (int c = 0; c < aether::phys_ct::numvar; ++c) {
-                    Cons_point.comp[c] = buffer[0].comp[c].data();
-                }
-                break;
-            default: 
-            throw std::invalid_argument("Invalid pass to the Rk_buffer constructor");
-            break;
-        }
+    // void init(Simulation &sim){
+    //     auto ext = &sim.prims_container.ext;
+    //     switch(sim.cfg.time_step){
+    //         case time_stepper::char_trace:
+    //             buffer.clear();
+    //             buffer.reserve(1);
+    //             buffer.emplace_back(CellsSoA(ext->nx,ext->ny,ext->nz,ext->ng));
+    //             Cons_point.ext = buffer[0].ext;
+    //             for (int c = 0; c < aether::phys_ct::numvar; ++c) {
+    //                 Cons_point.comp[c] = buffer[0].comp[c].data();
+    //             }
+    //             break;
+    //         default: 
+    //         throw std::invalid_argument("Invalid pass to the Rk_buffer constructor");
+    //         break;
+    //     }
         
         
 
         
-    }
+    // }
 };
 }

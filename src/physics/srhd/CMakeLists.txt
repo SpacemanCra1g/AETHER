@@ -3,7 +3,10 @@ add_library(aether_phys_srhd STATIC
   # add more SRHD-specific .cpp here
 )
 
-target_link_libraries(aether_phys_srhd PRIVATE aether_compile_options)
+target_link_libraries(aether_phys_srhd 
+  PRIVATE aether_compile_options
+  PUBLIC Kokkos::kokkos
+)
 
 target_include_directories(aether_phys_srhd
   PUBLIC ${PROJECT_SOURCE_DIR}/include

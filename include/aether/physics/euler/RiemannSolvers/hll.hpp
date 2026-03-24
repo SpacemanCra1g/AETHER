@@ -1,45 +1,36 @@
-#pragma once 
+#pragma once
 #include <aether/core/config.hpp>
 #include <aether/core/enums.hpp>
+#include <aether/physics/euler/convert.hpp>
 #include <aether/physics/euler/variable_structs.hpp>
+#include <Kokkos_Macros.hpp>
 #include <cmath>
 
-namespace aether::physics::euler{
-AETHER_INLINE prims hll(const prims& L, const prims& R, const double gamma) noexcept {
+namespace aether::physics::euler {
+
+
+KOKKOS_INLINE_FUNCTION
+prims hll(const prims& L, const prims& R, double gamma) noexcept {
     prims Flux{};
 
     const double inv_gm1 = 1.0 / (gamma - 1.0);
 
     // sound speeds
-    const double aL = std::sqrt(gamma * L.p / L.rho);
-    const double aR = std::sqrt(gamma * R.p / R.rho);
+    const double aL = sqrt(gamma * L.p / L.rho);
+    const double aR = sqrt(gamma * R.p / R.rho);
 
     // wave speed estimates
-    const double SL = std::fmin(L.vx - aL, R.vx - aR);
-    const double SR = std::fmax(L.vx + aL, R.vx + aR);
-
-    // Helper lambda, New syntax to me WOOT! 
-    auto flux_from_prim = [&](const prims& W) -> prims {
-        prims F{};
-        const double v2 = W.vx*W.vx + W.vy*W.vy + W.vz*W.vz;
-        const double E  = W.p * inv_gm1 + 0.5 * W.rho * v2;
-
-        F.rho = W.rho * W.vx;
-        F.vx  = W.rho * W.vx * W.vx + W.p;
-        F.vy  = W.rho * W.vx * W.vy;
-        F.vz  = W.rho * W.vx * W.vz;
-        F.p   = W.vx * (E + W.p); 
-        return F;
-    };
+    const double SL = fmin(L.vx - aL, R.vx - aR);
+    const double SR = fmax(L.vx + aL, R.vx + aR);
 
     // Supersonic left
     if (0.0 <= SL) {
-        return flux_from_prim(L);
+        return flux_from_prim_cell(L, gamma);
     }
 
     // Supersonic right
     if (SR <= 0.0) {
-        return flux_from_prim(R);
+        return flux_from_prim_cell(R, gamma);
     }
 
     // Star region (HLL)
@@ -49,7 +40,7 @@ AETHER_INLINE prims hll(const prims& L, const prims& R, const double gamma) noex
     const double v2R = R.vx*R.vx + R.vy*R.vy + R.vz*R.vz;
     const double ER  = R.p * inv_gm1 + 0.5 * R.rho * v2R;
 
-    // Conservative states (Euler)
+    // Conservative states
     const double UL0 = L.rho;
     const double UL1 = L.rho * L.vx;
     const double UL2 = L.rho * L.vy;
@@ -86,4 +77,5 @@ AETHER_INLINE prims hll(const prims& L, const prims& R, const double gamma) noex
 
     return Flux;
 }
-}
+
+} // namespace aether::physics::euler
