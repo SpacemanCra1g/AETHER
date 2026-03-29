@@ -1,11 +1,9 @@
 #pragma once
-#include "Kokkos_Macros.hpp"
 #include <Kokkos_Core.hpp>
 #include <aether/core/config.hpp>
 #include <aether/core/simulation.hpp>
 #include <aether/core/prim_layout.hpp>
 #include <aether/core/Kokkos_loopBounds.hpp>
-#include <cmath>
 
 using P = aether::prim::Prim;
 namespace loop = aether::loops;
@@ -32,14 +30,16 @@ double max_propagation_speed(aether::core::Simulation& sim){
             const double p   = prims(P::P,   k, j, i);
             const double cs  = sqrt(gamma * p / rho);
             double u_max = (fabs(prims(P::VX, k, j, i)) + cs) * dx_inv;
+            const double dy_inv_local = dy_inv;
+            const double dz_inv_local = dz_inv;
 
             if constexpr (P::HAS_VY) {
                 const double v_max = fabs(prims(P::VY, k, j, i)) + cs;
-                u_max = fmax(u_max, v_max * dy_inv);
+                u_max = fmax(u_max, v_max * dy_inv_local);
             }
             if constexpr (P::HAS_VZ) {
                 const double w_max = fabs(prims(P::VZ, k, j, i)) + cs;
-                u_max = fmax(u_max, w_max * dz_inv);
+                u_max = fmax(u_max, w_max * dz_inv_local);
             }
             local_max = fmax(local_max, u_max);
         },

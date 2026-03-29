@@ -13,7 +13,7 @@ namespace aether::core {
 template <int numvar, sweep_dir dir, class Sim, class CellViewT, class FaceViewT>
 AETHER_INLINE
 static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
-    const double dtdx =
+    const double dtdx_p =
         (dir == sweep_dir::x) ? (sim.time.dt / sim.grid.dx) :
         (dir == sweep_dir::y) ? (sim.time.dt / sim.grid.dy) :
                                 (sim.time.dt / sim.grid.dz);
@@ -28,12 +28,14 @@ static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             for (int c = 0; c < numvar; ++c) {
                 const double FR = FW(c, 0, k + koff, j + joff, i + ioff);
-                const double FL = FW(c, 0, k,         j,         i);
+                const double FL = FW(c, 0, k, j, i);
+                auto out_p = out;
+                const double dtdx = dtdx_p;
 
                 if constexpr (dir == sweep_dir::x) {
-                    out(c, k, j, i) = -dtdx * (FL - FR);
+                    out_p(c, k, j, i) = -dtdx * (FL - FR);
                 } else {
-                    out(c, k, j, i) += -dtdx * (FL - FR);
+                    out_p(c, k, j, i) += -dtdx * (FL - FR);
                 }
             }
         }

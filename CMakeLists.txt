@@ -109,15 +109,23 @@ set(AETHER_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(AETHER_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 
 # ---- Kokkos backend selection ------------------------------------------------
+# Start from a clean slate
 set(Kokkos_ENABLE_SERIAL OFF CACHE BOOL "" FORCE)
 set(Kokkos_ENABLE_OPENMP OFF CACHE BOOL "" FORCE)
 set(Kokkos_ENABLE_CUDA   OFF CACHE BOOL "" FORCE)
 
+# Enable requested backends independently
 if(ENABLE_CUDA)
   set(Kokkos_ENABLE_CUDA ON CACHE BOOL "" FORCE)
-elseif(ENABLE_OPENMP)
+endif()
+
+if(ENABLE_OPENMP)
   set(Kokkos_ENABLE_OPENMP ON CACHE BOOL "" FORCE)
-else()
+endif()
+
+# Kokkos requires at least one host backend.
+# If OpenMP is not enabled, fall back to Serial.
+if(NOT ENABLE_OPENMP)
   set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "" FORCE)
 endif()
 
@@ -217,6 +225,10 @@ target_link_libraries(aether_core
     Kokkos::kokkos
 )
 
+target_compile_options(aether_core PRIVATE
+    $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+)
+
 # OpenMP for legacy non-Kokkos code paths
 if(ENABLE_OPENMP)
   find_package(OpenMP REQUIRED)
@@ -259,15 +271,19 @@ if(AETHER_ENABLE_TESTS)
 endif()
 
 # ---- IPO/LTO guarded per-existing target ------------------------------------
+# ---- IPO/LTO guarded per-existing target ------------------------------------
 include(CheckIPOSupported)
 check_ipo_supported(RESULT AETHER_IPO_OK OUTPUT AETHER_IPO_MSG)
-if (AETHER_IPO_OK)
-  foreach(tgt aether_core aether_phys aether_phys_euler aether_phys_srhd aether_phys_mhd)
+
+if (AETHER_IPO_OK AND NOT ENABLE_CUDA)
+  foreach(tgt aether_core aether_phys aether_phys_euler aether_phys_srhd aether_phys_mhd aether.ex)
     if(TARGET ${tgt})
       set_property(TARGET ${tgt} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
       set_property(TARGET ${tgt} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
     endif()
   endforeach()
+elseif(ENABLE_CUDA)
+  message(STATUS "Disabling IPO/LTO because CUDA fatbins do not link reliably with LTO in this build.")
 else()
   message(STATUS "IPO/LTO not supported: ${AETHER_IPO_MSG}")
 endif()

@@ -46,27 +46,62 @@ struct VelMap<sweep_dir::z> {
 // Face loop bounds
 // Rank-3 always: (k,j,i)
 // ============================================================
-
 template<sweep_dir dir, class Sim>
-auto face_full(const Sim& sim) {
+auto face_halo1(const Sim& sim) {
     using exec_space = typename Sim::policy_type::execution_space;
 
     if constexpr (dir == sweep_dir::x) {
         return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            {0, 0, 0},
-            {sim.xfaces.Nz, sim.xfaces.Ny, sim.xfaces.Nfx}
+            { (Sim::dim > 2 ? 1 : 0), (Sim::dim > 1 ? 1 : 0), 1 },
+            { sim.xfaces.Nz - (Sim::dim > 2 ? 1 : 0),
+              sim.xfaces.Ny - (Sim::dim > 1 ? 1 : 0),
+              sim.xfaces.Nfx - 1 }
         );
     }
     else if constexpr (dir == sweep_dir::y) {
         return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            {0, 0, 0},
-            {sim.yfaces.Nz, sim.yfaces.Nfy, sim.yfaces.Nx}
+            { (Sim::dim > 2 ? 1 : 0), 1, (Sim::dim > 1 ? 1 : 0) },
+            { sim.yfaces.Nz - (Sim::dim > 2 ? 1 : 0),
+              sim.yfaces.Nfy - 1,
+              sim.yfaces.Nx - 1 }
         );
     }
     else {
         return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            {0, 0, 0},
-            {sim.zfaces.Nfz, sim.zfaces.Ny, sim.zfaces.Nx}
+            { 1, 1, 1 },
+            { sim.zfaces.Nfz - 1,
+              sim.zfaces.Ny  - 1,
+              sim.zfaces.Nx  - 1 }
+        );
+    }
+}
+
+template<sweep_dir dir, class Sim>
+auto face_halo2(const Sim& sim) {
+    using exec_space = typename Sim::policy_type::execution_space;
+
+    if constexpr (dir == sweep_dir::x) {
+        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+            { (Sim::dim > 2 ? 2 : 0), (Sim::dim > 1 ? 2 : 0), 2 },
+            { sim.xfaces.Nz - (Sim::dim > 2 ? 2 : 0),
+              sim.xfaces.Ny - (Sim::dim > 1 ? 2 : 0),
+              sim.xfaces.Nfx - 2 }
+        );
+    }
+    else if constexpr (dir == sweep_dir::y) {
+        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+            { (Sim::dim > 2 ? 2 : 0), 2, (Sim::dim > 1 ? 2 : 0) },
+            { sim.yfaces.Nz - (Sim::dim > 2 ? 2 : 0),
+              sim.yfaces.Nfy - 2,
+              sim.yfaces.Nx - 2 }
+        );
+    }
+    else {
+        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+            { 2, 2, 2 },
+            { sim.zfaces.Nfz - 2,
+              sim.zfaces.Ny  - 2,
+              sim.zfaces.Nx  - 2 }
         );
     }
 }
@@ -133,13 +168,15 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
     auto FR   = flux_right_view<dir>(v);
     auto Flux = flux_view<dir>(v);
 
-    const double gamma = sim.grid.gamma;
+    const double gamma_P = sim.grid.gamma;
     const int quad     = sim.grid.quad;
 
     Kokkos::parallel_for(
         "Riemann_sweep",
-        face_full<dir>(sim),
+        // TODO::: THIS IS CHANGED TO HALO2
+        face_halo2<dir>(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            const double gamma = gamma_P;
             for (int q = 0; q < quad; ++q) {
                 aether::phys::prims L{};
                 aether::phys::prims R{};
@@ -171,6 +208,17 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                 }
                 R.p   = FR(P::P, q, k, j, i);
 
+                if (!(L.rho > 0.0) || !(R.rho > 0.0) || !(L.p >= 0.0) || !(R.p >= 0.0) ||
+    !std::isfinite(L.rho) || !std::isfinite(R.rho) || !std::isfinite(L.p) || !std::isfinite(R.p)) {
+    printf("BAD RIEMANN INPUT dir=%d k=%d j=%d i=%d q=%d | "
+           "L=(rho=%e p=%e vx=%e vy=%e vz=%e) "
+           "R=(rho=%e p=%e vx=%e vy=%e vz=%e)\n",
+           int(dir), k, j, i, q,
+           L.rho, L.p, L.vx, L.vy, L.vz,
+           R.rho, R.p, R.vx, R.vy, R.vz);
+    Kokkos::abort("bad riemann input");
+}
+
                 if constexpr (solv == riemann::hll) {
                     F = hll(L, R, gamma);
                 }
@@ -196,6 +244,29 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
 template<class Sim, class V>
 void Riemann_dispatch(Sim& sim, V& v) {
+    auto view = sim.view();
+auto prim = view.prim;
+
+Kokkos::parallel_for(
+    "check_prim",
+    loop::cells_full(sim),
+    KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const double rho = prim(P::RHO,k,j,i);
+        const double p   = prim(P::P  ,k,j,i);
+
+        if (!(rho > 0.0) || !(p >= 0.0) || !std::isfinite(rho) || !std::isfinite(p)) {
+            printf("BAD PRIM at k=%d j=%d i=%d | rho=%e vx=%e vy=%e vz=%e p=%e\n",
+                   k,j,i,
+                   prim(P::RHO,k,j,i),
+                   prim(P::VX ,k,j,i),
+                   prim(P::VY ,k,j,i),
+                   prim(P::VZ ,k,j,i),
+                   prim(P::P  ,k,j,i));
+            Kokkos::abort("bad primitive state before Riemann");
+        }
+    }
+);
+
     switch (sim.cfg.riem) {
         case riemann::hll:
             Riemann_sweep<riemann::hll, sweep_dir::x>(sim, v);

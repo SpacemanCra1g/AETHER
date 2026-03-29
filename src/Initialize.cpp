@@ -123,8 +123,8 @@ static AETHER_INLINE void load_sedov(Sim &sim){
         );
     } 
     else if constexpr (DIM==3) {
-        const double cen_z = (domain.z_min + domain.z_max)*.5;
-        const double z_start = domain.z_min + domain.dz*.5;
+        const double cen_z = (g.z_min + g.z_max)*.5;
+        const double z_start = g.z_min + domain.dz*.5;
         const double dz = domain.dz;
         double min = (dx >= dy) ? dy : dx;
         min = (min <= dz) ? min : dz;
@@ -217,10 +217,11 @@ static AETHER_INLINE void load_sod_y(Sim &sim){
 template<typename Sim>
 static AETHER_INLINE void load_sod_z(Sim &sim){
     auto domain = sim.view();
+    auto& g = sim.grid;
     auto prim = domain.prim;
-    const double domain_mid = .5*(domain.z_max + domain.z_min);
+    const double domain_mid = .5*(g.z_max + g.z_min);
     const double dz = domain.dz;
-    const double z_min = domain.z_min;
+    const double z_min = g.z_min;
     const int ng = domain.ng;
     
     Kokkos::parallel_for(

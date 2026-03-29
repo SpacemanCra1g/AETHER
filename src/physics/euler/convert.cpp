@@ -1,4 +1,3 @@
-#include "Kokkos_Macros.hpp"
 #include "aether/core/simulation.hpp"
 #include <aether/physics/euler/convert.hpp>
 #include <aether/core/prim_layout.hpp>

@@ -13,10 +13,11 @@
 #include <aether/core/CTU/ctu_total_correction.hpp>
 #include <aether/io/snapshot.hpp>
 #include <omp.h>
+#include <fenv.h>
 #include <Kokkos_Core.hpp>
 
 int main(){
-  // feenableexcept(FE_INVALID);
+  feenableexcept(FE_INVALID);
   using namespace aether::core; {
   
   Kokkos::initialize();
@@ -57,7 +58,7 @@ int main(){
     axpy(domain.cons, -1.0, domain.prim);
     boundary_conditions(sim,domain.cons);
     aether::phys::cons_to_prims_domain(sim);
-  } while (sim.time.t < sim.time.t_end );
+  } while (sim.time.t < sim.time.t_end);
     // aether::phys::calc_eigenvecs(View.prim, View.eigs, sim.grid.gamma);
     
   std::cout << "The final time is " << sim.time.t << "\n";

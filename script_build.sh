@@ -1,0 +1,17 @@
+#!/usr/bin/zsh
+
+cmake -S . -B build-debug-3D \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DKokkos_ARCH_AMPERE86=OFF \
+    -DKokkos_ENABLE_DEBUG=ON \
+    -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=ON \
+    -DKokkos_ENABLE_AGGRESSIVE_VECTORIZATION=OFF \
+    -DKokkos_ENABLE_OPENMP=ON \
+    -DKokkos_ENABLE_CUDA=OFF \
+    -DKokkos_ENABLE_THREADS=OFF \
+    -DKokkos_ENABLE_SERIAL=OFF \
+    -DKokkos_ENABLE_CUDA_LAMBDA=OFF \
+    -DAETHER_DIM=3 \
+    -DAETHER_PHYSICS=Euler \
+    -DENABLE_OPENMP=ON \
+    -DENABLE_CUDA=OFF

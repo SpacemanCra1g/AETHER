@@ -1,5 +1,4 @@
 #pragma once
-#include <array>
 #include <cmath>
 #include <Kokkos_Macros.hpp>
 #include <aether/core/config.hpp>
@@ -11,13 +10,17 @@ namespace aether::math {
     // ======================================================
     template<int Size>
     struct Vec {
-        std::array<double, Size> data{};
+        double data[Size];
         static constexpr int size = Size;
 
         KOKKOS_INLINE_FUNCTION
-        Vec() = default;
+        Vec() {
+            for (int c = 0; c < Size; ++c) {
+                data[c] = 0.0;
+            }
+        }
 
-        // Construct from array
+        // Construct from C array
         KOKKOS_INLINE_FUNCTION
         explicit Vec(const double (&vals)[Size]) {
             for (int c = 0; c < Size; ++c) {
@@ -31,6 +34,14 @@ namespace aether::math {
 
         KOKKOS_INLINE_FUNCTION
         const double& operator[](int i) const { return data[i]; }
+
+        // Utility
+        KOKKOS_INLINE_FUNCTION
+        void fill(double x) {
+            for (int c = 0; c < Size; ++c) {
+                data[c] = x;
+            }
+        }
 
         // Arithmetic Operators
         KOKKOS_INLINE_FUNCTION
@@ -176,7 +187,7 @@ namespace aether::math {
     // ======================================================
     template<int Size>
     struct Mat {
-        std::array<Vec<Size>, Size> row{}; // row-major: row[i][j]
+        Vec<Size> row[Size]; // row-major: row[i][j]
 
         KOKKOS_INLINE_FUNCTION
         Mat() = default;
@@ -211,6 +222,14 @@ namespace aether::math {
 
         KOKKOS_INLINE_FUNCTION
         const Vec<Size>& operator[](int i) const { return row[i]; }
+
+        // Utility
+        KOKKOS_INLINE_FUNCTION
+        void fill(double x) {
+            for (int i = 0; i < Size; ++i) {
+                row[i].fill(x);
+            }
+        }
 
         // Elementwise matrix arithmetic
         KOKKOS_INLINE_FUNCTION

@@ -1,8 +1,11 @@
 #include <Kokkos_Core.hpp>
+#include <cmath>
+
 #include <aether/core/CTU/ctu_half_time_step.hpp>
 #include <aether/core/RiemannDispatch.hpp>
 #include <aether/core/simulation.hpp>
 #include <aether/core/con_layout.hpp>
+#include <aether/core/prim_layout.hpp>
 #include <aether/physics/api.hpp>
 
 namespace aether::core {
@@ -10,6 +13,7 @@ namespace aether::core {
 using prims = aether::phys::prims;
 using cons  = aether::phys::cons;
 using C     = aether::con::Cons;
+using P     = aether::prim::Prim;
 
 namespace detail {
 
@@ -50,36 +54,6 @@ bool prims_valid(const prims& x) noexcept {
 }
 
 // ============================================================
-// conservative backup helpers
-// ============================================================
-
-template<class BackupT>
-KOKKOS_INLINE_FUNCTION
-void backup_cons(const BackupT& backup, const int q,
-                 const int k, const int j, const int i,
-                 const cons& x) noexcept {
-    backup(C::RHO, q, k, j, i) = x.rho;
-    backup(C::MX,  q, k, j, i) = x.mx;
-    backup(C::MY,  q, k, j, i) = x.my;
-    if constexpr (C::HAS_MZ) backup(C::MZ, q, k, j, i) = x.mz;
-    backup(C::E,   q, k, j, i) = x.E;
-}
-
-template<class BackupT>
-KOKKOS_INLINE_FUNCTION
-cons load_backup_cons(const BackupT& backup, const int q,
-                      const int k, const int j, const int i) noexcept {
-    cons x{};
-    x.rho = backup(C::RHO, q, k, j, i);
-    x.mx  = backup(C::MX,  q, k, j, i);
-    x.my  = backup(C::MY,  q, k, j, i);
-    x.mz  = 0.0;
-    if constexpr (C::HAS_MZ) x.mz = backup(C::MZ, q, k, j, i);
-    x.E   = backup(C::E,   q, k, j, i);
-    return x;
-}
-
-// ============================================================
 // conservative flux difference helper
 // ============================================================
 
@@ -111,14 +85,14 @@ prims recover_prims(const cons& x, const double gamma) noexcept {
 }
 
 KOKKOS_INLINE_FUNCTION
-prims recover_prims_or_fallback(const cons& corrected,
-                                const cons& fallback,
-                                const double gamma) noexcept {
-    prims x = aether::phys::cons_to_prims_cell(corrected, gamma);
-    if (!prims_valid(x)) {
-        x = aether::phys::cons_to_prims_cell(fallback, gamma);
+prims recover_prims_or_face_fallback(const cons& corrected,
+                                     const prims& fallback_face,
+                                     const double gamma) noexcept {
+    prims qp = recover_prims(corrected, gamma);
+    if (!prims_valid(qp)) {
+        qp = fallback_face;
     }
-    return x;
+    return qp;
 }
 
 template<class FaceOutT, class FluxT>
@@ -140,11 +114,12 @@ void correct_face_2d(const FaceOutT& out_faces, const int q,
     store_face_prims(out_faces, q, ok, oj, oi, qp);
 }
 
-template<class FaceOutT, class BackupT, class Flux1T, class Flux2T>
+template<class FaceInT, class FaceOutT, class Flux1T, class Flux2T>
 KOKKOS_INLINE_FUNCTION
-void write_half_step_with_fallback(const FaceOutT& out_faces, const int q,
+void write_half_step_with_fallback(const FaceInT& base_faces,
+                                   const FaceOutT& out_faces,
+                                   const int q,
                                    const int ok, const int oj, const int oi,
-                                   const BackupT& backup,
                                    const Flux1T& F1,
                                    const int f1_klo, const int f1_jlo, const int f1_ilo,
                                    const int f1_khi, const int f1_jhi, const int f1_ihi,
@@ -154,12 +129,90 @@ void write_half_step_with_fallback(const FaceOutT& out_faces, const int q,
                                    const int f2_khi, const int f2_jhi, const int f2_ihi,
                                    const double c2,
                                    const double gamma) noexcept {
-    const cons q0 = load_backup_cons(backup, q, ok, oj, oi);
-    cons qc = q0;
-    qc = add_flux_diff(qc, F1, q, f1_klo, f1_jlo, f1_ilo, f1_khi, f1_jhi, f1_ihi, c1);
-    qc = add_flux_diff(qc, F2, q, f2_klo, f2_jlo, f2_ilo, f2_khi, f2_jhi, f2_ihi, c2);
+    const prims q0p = load_face_prims(base_faces, q, ok, oj, oi);
+    const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
 
-    const prims qp = recover_prims_or_fallback(qc, q0, gamma);
+    cons qc = q0;
+    qc = add_flux_diff(qc, F1, q,
+                       f1_klo, f1_jlo, f1_ilo,
+                       f1_khi, f1_jhi, f1_ihi,
+                       c1);
+    qc = add_flux_diff(qc, F2, q,
+                       f2_klo, f2_jlo, f2_ilo,
+                       f2_khi, f2_jhi, f2_ihi,
+                       c2);
+
+    prims qp = recover_prims(qc, gamma);
+    if (!prims_valid(qp)) {
+        qp = q0p;
+    }
+
+    store_face_prims(out_faces, q, ok, oj, oi, qp);
+}
+
+template<class BackupT>
+KOKKOS_INLINE_FUNCTION
+void backup_cons(const BackupT& backup, const int q,
+                 const int k, const int j, const int i,
+                 const cons& x) noexcept {
+    backup(C::RHO, q, k, j, i) = x.rho;
+    backup(C::MX,  q, k, j, i) = x.mx;
+    backup(C::MY,  q, k, j, i) = x.my;
+    if constexpr (C::HAS_MZ) {
+        backup(C::MZ, q, k, j, i) = x.mz;
+    }
+    backup(C::E,   q, k, j, i) = x.E;
+}
+
+template<class BackupT>
+KOKKOS_INLINE_FUNCTION
+cons load_backup_cons(const BackupT& backup, const int q,
+                      const int k, const int j, const int i) noexcept {
+    cons x{};
+    x.rho = backup(C::RHO, q, k, j, i);
+    x.mx  = backup(C::MX,  q, k, j, i);
+    x.my  = backup(C::MY,  q, k, j, i);
+    x.mz  = 0.0;
+    if constexpr (C::HAS_MZ) {
+        x.mz = backup(C::MZ, q, k, j, i);
+    }
+    x.E   = backup(C::E,   q, k, j, i);
+    return x;
+}
+
+template<class FaceOutT, class BackupT, class Flux1T, class Flux2T>
+KOKKOS_INLINE_FUNCTION
+void write_half_step_with_fallback(
+    const FaceOutT& out_faces, const int q,
+    const int ok, const int oj, const int oi,
+    const BackupT& backup,
+    const Flux1T& F1,
+    const int f1_klo, const int f1_jlo, const int f1_ilo,
+    const int f1_khi, const int f1_jhi, const int f1_ihi,
+    const double c1,
+    const Flux2T& F2,
+    const int f2_klo, const int f2_jlo, const int f2_ilo,
+    const int f2_khi, const int f2_jhi, const int f2_ihi,
+    const double c2,
+    const double gamma) noexcept {
+
+    const cons q0 = load_backup_cons(backup, q, ok, oj, oi);
+
+    cons qc = q0;
+    qc = add_flux_diff(qc, F1, q,
+                       f1_klo, f1_jlo, f1_ilo,
+                       f1_khi, f1_jhi, f1_ihi,
+                       c1);
+    qc = add_flux_diff(qc, F2, q,
+                       f2_klo, f2_jlo, f2_ilo,
+                       f2_khi, f2_jhi, f2_ihi,
+                       c2);
+
+    prims qp = recover_prims(qc, gamma);
+    if (!prims_valid(qp)) {
+        qp = recover_prims(q0, gamma);
+    }
+
     store_face_prims(out_faces, q, ok, oj, oi, qp);
 }
 
@@ -204,8 +257,6 @@ void ctu_half_time_correction<2>(Simulation& sim, Simulation::View view) {
         KOKKOS_LAMBDA(const int kk, const int j, const int i) {
             (void)kk;
             for (int q = 0; q < quad; ++q) {
-                // x-right face at (j, i+1), x-left face at (j, i)
-                // y-top   face at (j+1, i), y-bottom face at (j, i)
                 detail::correct_face_2d(
                     Lx, q,
                     k, j, i + 1,
@@ -258,7 +309,7 @@ void ctu_half_time_correction<2>(Simulation& sim, Simulation::View view) {
 
 #if AETHER_DIM > 2
 template<>
-void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
+void ctu_half_time_correction<3>(Simulation& sim, Simulation::View view) {
     using exec_space = typename Simulation::policy_type::execution_space;
 
     const int ib = sim.cells.ibegin();
@@ -273,10 +324,6 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
     const double dyt_third = sim.time.dt / (3.0 * sim.grid.dy);
     const double dzt_third = sim.time.dt / (3.0 * sim.grid.dz);
 
-    const double dxt_half  = 0.5 * sim.time.dt / sim.grid.dx;
-    const double dyt_half  = 0.5 * sim.time.dt / sim.grid.dy;
-    const double dzt_half  = 0.5 * sim.time.dt / sim.grid.dz;
-
     const int quad = sim.grid.quad;
 
     auto ctu = sim.ctu_view();
@@ -289,13 +336,14 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
     auto ctu_Ly = ctu.fyL;  auto ctu_Ry = ctu.fyR;  auto ctu_Fy = ctu.fy;
     auto ctu_Lz = ctu.fzL;  auto ctu_Rz = ctu.fzR;  auto ctu_Fz = ctu.fz;
 
-    auto xL_bak = ctu.xL_bak; auto xR_bak = ctu.xR_bak;
-    auto yL_bak = ctu.yL_bak; auto yR_bak = ctu.yR_bak;
-    auto zL_bak = ctu.zL_bak; auto zR_bak = ctu.zR_bak;
+    // Replace these with your actual backup-buffer members if their names differ.
+    auto xL_bak = ctu.fxL;
+    auto xR_bak = ctu.fxR;
+    auto yL_bak = ctu.fyL;
+    auto yR_bak = ctu.fyR;
+    auto zL_bak = ctu.fzL;
+    auto zR_bak = ctu.fzR;
 
-    // --------------------------------------------------------
-    // first predictor stage
-    // --------------------------------------------------------
     Kokkos::parallel_for(
         "ctu_predictor_stage1_3d",
         Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
@@ -305,177 +353,190 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             for (int q = 0; q < quad; ++q) {
 
-                // x-left state at right x-face (i+1)
                 {
                     const prims q0p = detail::load_face_prims(Lx, q, k, j, i + 1);
                     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
                     detail::backup_cons(xL_bak, q, k, j, i + 1, q0);
 
-                    detail::store_face_prims(
-                        Lx, q, k, j, i + 1,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fy, q,
-                                k, j,     i,
-                                k, j + 1, i,
-                                +dyt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fy, q,
+                            k, j,     i,
+                            k, j + 1, i,
+                            +dyt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(Lx, q, k, j, i + 1, qp);
+                    }
 
-                    detail::store_face_prims(
-                        ctu_Lx, q, k, j, i + 1,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fz, q,
-                                k,     j, i,
-                                k + 1, j, i,
-                                +dzt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fz, q,
+                            k,     j, i,
+                            k + 1, j, i,
+                            +dzt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(ctu_Lx, q, k, j, i + 1, qp);
+                    }
                 }
 
-                // x-right state at left x-face (i)
                 {
                     const prims q0p = detail::load_face_prims(Rx, q, k, j, i);
                     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
                     detail::backup_cons(xR_bak, q, k, j, i, q0);
 
-                    detail::store_face_prims(
-                        Rx, q, k, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fy, q,
-                                k, j,     i,
-                                k, j + 1, i,
-                                +dyt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fy, q,
+                            k, j,     i,
+                            k, j + 1, i,
+                            +dyt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(Rx, q, k, j, i, qp);
+                    }
 
-                    detail::store_face_prims(
-                        ctu_Rx, q, k, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fz, q,
-                                k,     j, i,
-                                k + 1, j, i,
-                                +dzt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fz, q,
+                            k,     j, i,
+                            k + 1, j, i,
+                            +dzt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(ctu_Rx, q, k, j, i, qp);
+                    }
                 }
 
-                // y-left state at top y-face (j+1)
                 {
                     const prims q0p = detail::load_face_prims(Ly, q, k, j + 1, i);
                     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
                     detail::backup_cons(yL_bak, q, k, j + 1, i, q0);
 
-                    detail::store_face_prims(
-                        Ly, q, k, j + 1, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fx, q,
-                                k, j, i + 1,
-                                k, j, i,
-                                +dxt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fx, q,
+                            k, j, i + 1,
+                            k, j, i,
+                            +dxt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(Ly, q, k, j + 1, i, qp);
+                    }
 
-                    detail::store_face_prims(
-                        ctu_Ly, q, k, j + 1, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fz, q,
-                                k,     j, i,
-                                k + 1, j, i,
-                                +dzt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fz, q,
+                            k,     j, i,
+                            k + 1, j, i,
+                            +dzt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(ctu_Ly, q, k, j + 1, i, qp);
+                    }
                 }
 
-                // y-right state at bottom y-face (j)
                 {
                     const prims q0p = detail::load_face_prims(Ry, q, k, j, i);
                     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
                     detail::backup_cons(yR_bak, q, k, j, i, q0);
 
-                    detail::store_face_prims(
-                        Ry, q, k, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fx, q,
-                                k, j, i + 1,
-                                k, j, i,
-                                +dxt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fx, q,
+                            k, j, i + 1,
+                            k, j, i,
+                            +dxt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(Ry, q, k, j, i, qp);
+                    }
 
-                    detail::store_face_prims(
-                        ctu_Ry, q, k, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fz, q,
-                                k,     j, i,
-                                k + 1, j, i,
-                                +dzt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fz, q,
+                            k,     j, i,
+                            k + 1, j, i,
+                            +dzt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(ctu_Ry, q, k, j, i, qp);
+                    }
                 }
 
-                // z-left state at upper z-face (k+1)
                 {
                     const prims q0p = detail::load_face_prims(Lz, q, k + 1, j, i);
                     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
                     detail::backup_cons(zL_bak, q, k + 1, j, i, q0);
 
-                    detail::store_face_prims(
-                        Lz, q, k + 1, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fx, q,
-                                k, j, i + 1,
-                                k, j, i,
-                                +dxt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fx, q,
+                            k, j, i + 1,
+                            k, j, i,
+                            +dxt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(Lz, q, k + 1, j, i, qp);
+                    }
 
-                    detail::store_face_prims(
-                        ctu_Lz, q, k + 1, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fy, q,
-                                k, j,     i,
-                                k, j + 1, i,
-                                +dyt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fy, q,
+                            k, j,     i,
+                            k, j + 1, i,
+                            +dyt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(ctu_Lz, q, k + 1, j, i, qp);
+                    }
                 }
 
-                // z-right state at lower z-face (k)
                 {
                     const prims q0p = detail::load_face_prims(Rz, q, k, j, i);
                     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
                     detail::backup_cons(zR_bak, q, k, j, i, q0);
 
-                    detail::store_face_prims(
-                        Rz, q, k, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fx, q,
-                                k, j, i + 1,
-                                k, j, i,
-                                +dxt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fx, q,
+                            k, j, i + 1,
+                            k, j, i,
+                            +dxt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(Rz, q, k, j, i, qp);
+                    }
 
-                    detail::store_face_prims(
-                        ctu_Rz, q, k, j, i,
-                        detail::recover_prims(
-                            detail::add_flux_diff(q0, Fy, q,
-                                k, j,     i,
-                                k, j + 1, i,
-                                +dyt_third),
-                            gamma)
-                    );
+                    {
+                        const cons qc = detail::add_flux_diff(q0, Fy, q,
+                            k, j,     i,
+                            k, j + 1, i,
+                            +dyt_third);
+                        const prims qp = detail::recover_prims_or_face_fallback(qc, q0p, gamma);
+                        detail::store_face_prims(ctu_Rz, q, k, j, i, qp);
+                    }
                 }
             }
         }
     );
+}
 
-    Riemann_dispatch(sim, view);
-    Riemann_dispatch(sim, ctu);
+template<>
+void ctu_total_correction<3>(Simulation& sim, Simulation::View view) {
+    using exec_space = typename Simulation::policy_type::execution_space;
 
-    // --------------------------------------------------------
-    // half-step predictor stage
-    // --------------------------------------------------------
+    const int ib = sim.cells.ibegin();
+    const int ie = sim.cells.iend();
+    const int jb = sim.cells.jbegin();
+    const int je = sim.cells.jend();
+    const int kb = sim.cells.kbegin();
+    const int ke = sim.cells.kend();
+
+    const double gamma    = sim.grid.gamma;
+    const double dxt_half = 0.5 * sim.time.dt / sim.grid.dx;
+    const double dyt_half = 0.5 * sim.time.dt / sim.grid.dy;
+    const double dzt_half = 0.5 * sim.time.dt / sim.grid.dz;
+
+    const int quad = sim.grid.quad;
+
+    auto ctu = sim.ctu_view();
+
+    auto Lx = view.fxL;  auto Rx = view.fxR;  auto Fx = view.fx;
+    auto Ly = view.fyL;  auto Ry = view.fyR;  auto Fy = view.fy;
+    auto Lz = view.fzL;  auto Rz = view.fzR;  auto Fz = view.fz;
+
+    auto ctu_Fx = ctu.fx;
+    auto ctu_Fy = ctu.fy;
+    auto ctu_Fz = ctu.fz;
+
+    // Replace these with your actual backup-buffer members if their names differ.
+    auto xL_bak = ctu.fxL;
+    auto xR_bak = ctu.fxR;
+    auto yL_bak = ctu.fyL;
+    auto yR_bak = ctu.fyR;
+    auto zL_bak = ctu.fzL;
+    auto zR_bak = ctu.fzR;
+
     Kokkos::parallel_for(
         "ctu_predictor_stage2_3d",
         Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
@@ -486,7 +547,8 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
             for (int q = 0; q < quad; ++q) {
 
                 detail::write_half_step_with_fallback(
-                    Lx, q, k, j, i + 1, xL_bak,
+                    Lx, q, k, j, i + 1,
+                    xL_bak,
                     ctu_Fy,
                     k, j + 1, i,
                     k, j,     i,
@@ -499,7 +561,8 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
                 );
 
                 detail::write_half_step_with_fallback(
-                    Rx, q, k, j, i, xR_bak,
+                    Rx, q, k, j, i,
+                    xR_bak,
                     ctu_Fy,
                     k, j + 1, i,
                     k, j,     i,
@@ -512,7 +575,8 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
                 );
 
                 detail::write_half_step_with_fallback(
-                    Ly, q, k, j + 1, i, yL_bak,
+                    Ly, q, k, j + 1, i,
+                    yL_bak,
                     ctu_Fx,
                     k, j, i + 1,
                     k, j, i,
@@ -525,7 +589,8 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
                 );
 
                 detail::write_half_step_with_fallback(
-                    Ry, q, k, j, i, yR_bak,
+                    Ry, q, k, j, i,
+                    yR_bak,
                     ctu_Fx,
                     k, j, i + 1,
                     k, j, i,
@@ -538,7 +603,8 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
                 );
 
                 detail::write_half_step_with_fallback(
-                    Lz, q, k + 1, j, i, zL_bak,
+                    Lz, q, k + 1, j, i,
+                    zL_bak,
                     Fx,
                     k, j, i + 1,
                     k, j, i,
@@ -551,7 +617,8 @@ void ctu_half_time_correction<3>(Simulation& sim, Simulation::View& view) {
                 );
 
                 detail::write_half_step_with_fallback(
-                    Rz, q, k, j, i, zR_bak,
+                    Rz, q, k, j, i,
+                    zR_bak,
                     Fx,
                     k, j, i + 1,
                     k, j, i,
