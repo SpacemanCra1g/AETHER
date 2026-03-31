@@ -1,3 +1,4 @@
+#include "Kokkos_Macros.hpp"
 #include <Kokkos_Core.hpp>
 #include <cmath>
 
@@ -30,9 +31,9 @@ prims load_face_prims(const FaceT& faces, const int q,
     x.vx  = faces(P::VX,  q, k, j, i);
     x.vy  = 0.0;
     x.vz  = 0.0;
-    if constexpr (P::HAS_VY) x.vy = faces(P::VY, q, k, j, i);
-    if constexpr (P::HAS_VZ) x.vz = faces(P::VZ, q, k, j, i);
-    x.p   = faces(P::P,   q, k, j, i);
+    x.vy = faces(P::VY, q, k, j, i);
+    x.vz = (P::HAS_VZ) ? faces(P::VZ, q, k, j, i) : 0.0;
+    x.p   = faces(P::P, q, k, j, i);
     return x;
 }
 
@@ -43,7 +44,7 @@ void store_face_prims(const FaceT& faces, const int q,
                       const prims& x) noexcept {
     faces(P::RHO, q, k, j, i) = x.rho;
     faces(P::VX,  q, k, j, i) = x.vx;
-    if constexpr (P::HAS_VY) faces(P::VY, q, k, j, i) = x.vy;
+    faces(P::VY, q, k, j, i) = x.vy;
     if constexpr (P::HAS_VZ) faces(P::VZ, q, k, j, i) = x.vz;
     faces(P::P,   q, k, j, i) = x.p;
 }
@@ -51,6 +52,31 @@ void store_face_prims(const FaceT& faces, const int q,
 KOKKOS_INLINE_FUNCTION
 bool prims_valid(const prims& x) noexcept {
     return std::isfinite(x.rho) && std::isfinite(x.p) && (x.rho > 0.0) && (x.p > 0.0);
+}
+
+template<class FaceT>
+KOKKOS_INLINE_FUNCTION
+void backup_cons(FaceT& backup, const int q,
+                      const int k, const int j, const int i,
+                      const cons& x) noexcept{
+
+    backup(C::RHO,q,k,j,i) = x.rho;
+    backup(C::MX,q,k,j,i) = x.mx;
+    backup(C::MY,q,k,j,i) = x.my;
+    if constexpr (C::HAS_MZ) backup(C::MZ,q,k,j,i) = x.mz;
+    backup(C::E,q,k,j,i) = x.E;
+}
+
+template<class FaceT>
+KOKKOS_INLINE_FUNCTION
+void load_backup_cons(FaceT& backup, const int q,
+                      const int k, const int j, const int i) noexcept{
+    cons x{};
+    x.rho = backup(C::RHO,q,k,j,i);
+    x.mx = backup(C::MX,q,k,j,i);
+    x.my = backup(C::MY,q,k,j,i);
+    x.mz = (C::HAS_MZ) ? backup(C::MZ,q,k,j,i) : 0.0;
+    x.E = backup(C::E,q,k,j,i);
 }
 
 // ============================================================
@@ -80,30 +106,35 @@ cons add_flux_diff(const cons& base,
 // ============================================================
 
 KOKKOS_INLINE_FUNCTION
-prims recover_prims(const cons& x, const double gamma) noexcept {
+prims recover_prims(cons x, const double gamma) noexcept {
     return aether::phys::cons_to_prims_cell(x, gamma);
 }
 
 KOKKOS_INLINE_FUNCTION
-prims recover_prims_or_face_fallback(const cons& corrected,
-                                     const prims& fallback_face,
-                                     const double gamma) noexcept {
+prims recover_prims_or_fallback(cons corrected,
+                                     cons fallback,
+                                     double gamma) noexcept {
     prims qp = recover_prims(corrected, gamma);
     if (!prims_valid(qp)) {
-        qp = fallback_face;
+        qp = recover_prims(fallback, gamma);
     }
     return qp;
 }
 
+
+// ============================================================
+// common wrappers
+// ============================================================
+
 template<class FaceOutT, class FluxT>
 KOKKOS_INLINE_FUNCTION
-void correct_face_2d(const FaceOutT& out_faces, const int q,
+void correct_face_2d(FaceOutT& out_faces, const int q,
                      const int ok, const int oj, const int oi,
-                     const FluxT& transverse_flux,
-                     const int klo, const int jlo, const int ilo,
-                     const int khi, const int jhi, const int ihi,
-                     const double coeff,
-                     const double gamma) noexcept {
+                     FluxT& transverse_flux,
+                     int klo, const int jlo, const int ilo,
+                     int khi, const int jhi, const int ihi,
+                     double coeff,
+                     double gamma) noexcept {
     const prims q0p = load_face_prims(out_faces, q, ok, oj, oi);
     const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
     const cons  qc  = add_flux_diff(q0, transverse_flux, q,
@@ -114,120 +145,38 @@ void correct_face_2d(const FaceOutT& out_faces, const int q,
     store_face_prims(out_faces, q, ok, oj, oi, qp);
 }
 
-template<class FaceInT, class FaceOutT, class Flux1T, class Flux2T>
+template<class FaceOutT, class BackupT, class Flux1T, class Flux2T>
 KOKKOS_INLINE_FUNCTION
-void write_half_step_with_fallback(const FaceInT& base_faces,
-                                   const FaceOutT& out_faces,
+void write_half_step_with_fallback(FaceOutT& out_faces,
                                    const int q,
                                    const int ok, const int oj, const int oi,
-                                   const Flux1T& F1,
+                                   BackupT& backup,
+                                   Flux1T& F1,
                                    const int f1_klo, const int f1_jlo, const int f1_ilo,
                                    const int f1_khi, const int f1_jhi, const int f1_ihi,
                                    const double c1,
-                                   const Flux2T& F2,
+                                   Flux2T& F2,
                                    const int f2_klo, const int f2_jlo, const int f2_ilo,
                                    const int f2_khi, const int f2_jhi, const int f2_ihi,
                                    const double c2,
                                    const double gamma) noexcept {
-    const prims q0p = load_face_prims(base_faces, q, ok, oj, oi);
-    const cons  q0  = aether::phys::prims_to_cons_cell(q0p, gamma);
 
+    cons q0 = load_backup_cons(backup, q, ok, oj, oi);
     cons qc = q0;
-    qc = add_flux_diff(qc, F1, q,
-                       f1_klo, f1_jlo, f1_ilo,
-                       f1_khi, f1_jhi, f1_ihi,
-                       c1);
-    qc = add_flux_diff(qc, F2, q,
-                       f2_klo, f2_jlo, f2_ilo,
-                       f2_khi, f2_jhi, f2_ihi,
-                       c2);
 
-    prims qp = recover_prims(qc, gamma);
-    if (!prims_valid(qp)) {
-        qp = q0p;
-    }
+    qc = add_flux_diff(qc, F1, q, f1_klo, f1_jlo, f1_ilo, f1_khi, f1_jhi, f1_ihi, c1);
+    qc = add_flux_diff(qc, F2, q, f2_klo, f2_jlo, f2_ilo, f2_khi, f2_jhi, f2_ihi, c2);
 
+    prims qp = recover_prims_or_fallback(qc,q0, gamma);
     store_face_prims(out_faces, q, ok, oj, oi, qp);
 }
 
-template<class BackupT>
-KOKKOS_INLINE_FUNCTION
-void backup_cons(const BackupT& backup, const int q,
-                 const int k, const int j, const int i,
-                 const cons& x) noexcept {
-    backup(C::RHO, q, k, j, i) = x.rho;
-    backup(C::MX,  q, k, j, i) = x.mx;
-    backup(C::MY,  q, k, j, i) = x.my;
-    if constexpr (C::HAS_MZ) {
-        backup(C::MZ, q, k, j, i) = x.mz;
-    }
-    backup(C::E,   q, k, j, i) = x.E;
-}
-
-template<class BackupT>
-KOKKOS_INLINE_FUNCTION
-cons load_backup_cons(const BackupT& backup, const int q,
-                      const int k, const int j, const int i) noexcept {
-    cons x{};
-    x.rho = backup(C::RHO, q, k, j, i);
-    x.mx  = backup(C::MX,  q, k, j, i);
-    x.my  = backup(C::MY,  q, k, j, i);
-    x.mz  = 0.0;
-    if constexpr (C::HAS_MZ) {
-        x.mz = backup(C::MZ, q, k, j, i);
-    }
-    x.E   = backup(C::E,   q, k, j, i);
-    return x;
-}
-
-template<class FaceOutT, class BackupT, class Flux1T, class Flux2T>
-KOKKOS_INLINE_FUNCTION
-void write_half_step_with_fallback(
-    const FaceOutT& out_faces, const int q,
-    const int ok, const int oj, const int oi,
-    const BackupT& backup,
-    const Flux1T& F1,
-    const int f1_klo, const int f1_jlo, const int f1_ilo,
-    const int f1_khi, const int f1_jhi, const int f1_ihi,
-    const double c1,
-    const Flux2T& F2,
-    const int f2_klo, const int f2_jlo, const int f2_ilo,
-    const int f2_khi, const int f2_jhi, const int f2_ihi,
-    const double c2,
-    const double gamma) noexcept {
-
-    const cons q0 = load_backup_cons(backup, q, ok, oj, oi);
-
-    cons qc = q0;
-    qc = add_flux_diff(qc, F1, q,
-                       f1_klo, f1_jlo, f1_ilo,
-                       f1_khi, f1_jhi, f1_ihi,
-                       c1);
-    qc = add_flux_diff(qc, F2, q,
-                       f2_klo, f2_jlo, f2_ilo,
-                       f2_khi, f2_jhi, f2_ihi,
-                       c2);
-
-    prims qp = recover_prims(qc, gamma);
-    if (!prims_valid(qp)) {
-        qp = recover_prims(q0, gamma);
-    }
-
-    store_face_prims(out_faces, q, ok, oj, oi, qp);
-}
-
-} // namespace detail
-
-
-// ============================================================
-// 2D CTU half-step correction
-// ============================================================
 
 #if AETHER_DIM > 1
 template<>
 void ctu_half_time_correction<2>(Simulation& sim, Simulation::View view) {
-    using exec_space = typename Simulation::policy_type::execution_space;
 
+    using exec_space = typename Simulation::policy_type::execution_space;
     const int ib = sim.cells.ibegin();
     const int ie = sim.cells.iend();
     const int jb = sim.cells.jbegin();
@@ -250,52 +199,17 @@ void ctu_half_time_correction<2>(Simulation& sim, Simulation::View view) {
 
     Kokkos::parallel_for(
         "ctu_half_time_correction_2d",
-        Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            {0, jb - 1, ib - 1},
-            {1, je + 1, ie + 1}
+        Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+            {jb - 1, ib - 1},
+            {je + 1, ie + 1}
         ),
-        KOKKOS_LAMBDA(const int kk, const int j, const int i) {
-            (void)kk;
+        KOKKOS_LAMBDA(const int j, const int i) {
             for (int q = 0; q < quad; ++q) {
-                detail::correct_face_2d(
-                    Lx, q,
-                    k, j, i + 1,
-                    Fy,
-                    k, j,     i,
-                    k, j + 1, i,
-                    -dyt_half,
-                    gamma
-                );
-
-                detail::correct_face_2d(
-                    Rx, q,
-                    k, j, i,
-                    Fy,
-                    k, j,     i,
-                    k, j + 1, i,
-                    -dyt_half,
-                    gamma
-                );
-
-                detail::correct_face_2d(
-                    Ly, q,
-                    k, j + 1, i,
-                    Fx,
-                    k, j, i,
-                    k, j, i + 1,
-                    -dxt_half,
-                    gamma
-                );
-
-                detail::correct_face_2d(
-                    Ry, q,
-                    k, j, i,
-                    Fx,
-                    k, j, i,
-                    k, j, i + 1,
-                    -dxt_half,
-                    gamma
-                );
+                
+            detail::correct_face_2d(Lx,q, 0, j  , i+1, Fy, 0, j, i, 0, j+1, i  , -dyt_half, gamma);
+            detail::correct_face_2d(Rx,q, 0, j  , i  , Fy, 0, j, i, 0, j+1, i  , -dyt_half, gamma);
+            detail::correct_face_2d(Ly,q, 0, j+1, i  , Fx, 0, j, i, 0, j  , i+1, -dxt_half, gamma);
+            detail::correct_face_2d(Ry,q, 0, j  , i  , Fx, 0, j, i, 0, j  , i+1, -dxt_half, gamma);
             }
         }
     );

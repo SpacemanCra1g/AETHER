@@ -1,6 +1,6 @@
 #!/usr/bin/zsh
 
-cmake -S . -B build-debug-3D \
+cmake -S . -B build-debug-2D \
     -DCMAKE_BUILD_TYPE=Debug \
     -DKokkos_ARCH_AMPERE86=OFF \
     -DKokkos_ENABLE_DEBUG=ON \
@@ -11,7 +11,7 @@ cmake -S . -B build-debug-3D \
     -DKokkos_ENABLE_THREADS=OFF \
     -DKokkos_ENABLE_SERIAL=OFF \
     -DKokkos_ENABLE_CUDA_LAMBDA=OFF \
-    -DAETHER_DIM=3 \
+    -DAETHER_DIM=2 \
     -DAETHER_PHYSICS=Euler \
     -DENABLE_OPENMP=ON \
     -DENABLE_CUDA=OFF
