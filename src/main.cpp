@@ -2,6 +2,9 @@
 #include <aether/core/Initialize.hpp>
 #include <aether/core/RunParams_io.hpp>
 #include <aether/core/boundary_conditions.hpp>
+#include <aether/core/flux_difference.hpp>
+#include <aether/core/simulation.hpp>
+#include <aether/core/time_stepper_containers.hpp>
 #include <aether/io/snapshot.hpp>
 #include <aether/physics/api.hpp>
 #include <aether/core/TemporalDispatch.hpp>

@@ -13,6 +13,8 @@
 using chars = aether::core::one_cell_spectral_container;
 using vec   = aether::math::Vec<aether::phys_ct::numvar>;
 using prims = aether::phys::prims;
+#include <stdexcept>
+#include <iostream>
 
 namespace aether::core {
 
@@ -48,7 +50,7 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
             for (int c = 0; c < numvar; ++c) {
                 const double u = prim(c, k, j, i);
                 for (int q = 0; q < quad; ++q) {
-                    FR(c, q, k,      j,      i)      = u;
+                    FR(c, q, k     , j     , i     ) = u;
                     FL(c, q, k + k0, j + j0, i + i0) = u;
                 }
             }
@@ -502,6 +504,153 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fzR(c, q, k,   j, i) = p_vec_L[c];
                         view.fzL(c, q, k+1, j, i) = p_vec_R[c];
+// ---------- Basic r=3 GP functionality ----------
+AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
+    constexpr int numvar = aether::phys_ct::numvar;
+    constexpr int radius = 1;
+    constexpr int stencil_size = 2 * radius + 1; // 7x7
+    
+    auto view = sim.view();
+    auto prim = view.prim;
+    const int nx = view.nx;
+    const int ny = view.ny;
+    const int ng = view.ng;
+    
+    // Loop over interior cells (excluding ghost cells)
+    Kokkos::parallel_for(
+        "gp_2d_stencil",
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>(
+            {ng, ng}, {ng + ny, ng + nx}
+        ),
+        KOKKOS_LAMBDA(const int j, const int i) {
+            
+            double stencil[numvar][stencil_size*stencil_size];
+            
+            for (int c = 0; c < numvar; ++c) {
+                for (int di = -radius; di <= radius; ++di) {
+                    for (int dj = -radius; dj <= radius; ++dj) {
+                        stencil[c][ (di + radius) * stencil_size + (dj + radius) ] = prim(c, 0, j + dj, i + di);
+                    }
+                }
+            }
+            
+            // Compute mean of stencil values for each component
+            double stencil_mean[numvar];
+            for (int c = 0; c < numvar; ++c) {
+                stencil_mean[c] = 0.0;
+                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                    stencil_mean[c] += stencil[c][k];
+                }
+                stencil_mean[c] /= (stencil_size * stencil_size);
+            }
+            
+            // Subtract mean from stencil values to get deviations
+            double stencil_dev[numvar][stencil_size*stencil_size];
+            for (int c = 0; c < numvar; ++c) {
+                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                    stencil_dev[c][k] = stencil[c][k] - stencil_mean[c];
+                }
+            }
+            
+            // Compute alpha = K^-1 @ stencil using Cholesky factorization
+            // where gp_L_mat contains L such that K = L*L^T
+            double alpha[numvar][stencil_size*stencil_size];
+            for (int c = 0; c < numvar; ++c) {
+                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                    alpha[c][k] = 0.0;
+                }
+            }
+            
+            for (int c = 0; c < numvar; ++c) {
+                // First, solve L*y = stencil_dev for y (forward substitution)
+                double y[stencil_size*stencil_size];
+                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                    double sum = stencil_dev[c][k];
+                    for (int m = 0; m < k; ++m) {
+                        sum -= view.gp_L_mat(k, m) * y[m];
+                    }
+                    y[k] = sum / view.gp_L_mat(k, k);
+                }
+                
+                // Then, solve L^T*alpha = y for alpha (backward substitution)
+                for (int k = stencil_size*stencil_size - 1; k >= 0; --k) {
+                    double sum = y[k];
+                    for (int m = k + 1; m < stencil_size*stencil_size; ++m) {
+                        sum -= view.gp_L_mat(m, k) * alpha[c][m];
+                    }
+                    alpha[c][k] = sum / view.gp_L_mat(k, k);
+                }
+            }
+            // for (int c = 0; c < numvar; ++c) {
+            //     for (int k = 0; k < stencil_size*stencil_size; ++k) {
+            //         printf("alpha[%d][%d] = %f\n", c, k, alpha[c][k]);
+            //     }
+            // }   
+            
+            // Compute Marginal Log Likelihood (MLL) for each component
+            double mll;
+            const int n = stencil_size * stencil_size;
+            const double log_2pi = 1.8378770664093453; // log(2*pi)
+            bool use_fallback = false;
+            
+            for (int c = 0; c < numvar; ++c) {
+                // Compute y^T * alpha
+                double y_dot_alpha = 0.0;
+                for (int k = 0; k < n; ++k) {
+                    y_dot_alpha += stencil[c][k] * alpha[c][k];
+                }
+                
+                // Compute log(det(K)) = 2 * sum(log(diag(L)))
+                double log_det_K = 0.0;
+                for (int k = 0; k < n; ++k) {
+                    log_det_K += 2.0 * Kokkos::log(view.gp_L_mat(k, k));
+                }
+                
+                // MLL = -0.5 * (y^T*alpha + log(det(K)) + n*log(2*pi))
+                mll = -0.5 * (y_dot_alpha + log_det_K + n * log_2pi);
+                if (mll <= 0.0) {
+                    use_fallback = true;
+                    break;
+                }
+            }
+
+            // Set the fallback mask for this cell
+            // view.gp_fallback_mask(j - ng, i - ng) = use_fallback;
+
+            if (use_fallback) {
+                // Use FOG fallback when MLL indicates poor GP model quality
+                for (int c = 0; c < numvar; ++c) {
+                    const double u = prim(c, 0, j, i);
+                    for (int q = 0; q < view.quad; ++q) {
+                        // X-direction fluxes (like FOG_sweep<sweep_dir::x>)
+                        view.fxR(c, q, 0, j, i) = u;
+                        view.fxL(c, q, 0, j, i+1) = u;
+                        
+                        // Y-direction fluxes (like FOG_sweep<sweep_dir::y>)
+                        view.fyR(c, q, 0, j, i) = u;
+                        view.fyL(c, q, 0, j+1, i) = u;
+                    }
+                }
+            } else {
+                // Use GP predictions when MLL indicates good model quality
+                for (int c = 0; c < numvar; ++c) {
+                    double pred_l = 0.0;
+                    double pred_r = 0.0;
+                    double pred_u = 0.0;
+                    double pred_d = 0.0;
+
+                    for (int k = 0; k < n; ++k) {
+                        pred_l += view.gp_k_star_l(k) * alpha[c][k];
+                        pred_r += view.gp_k_star_r(k) * alpha[c][k];
+                        pred_u += view.gp_k_star_u(k) * alpha[c][k];
+                        pred_d += view.gp_k_star_d(k) * alpha[c][k];
+                    }
+
+                    for (int q = 0; q < view.quad; ++q) {
+                        view.fxL(c, q, 0, j, i) = pred_l + stencil_mean[c];
+                        view.fxR(c, q, 0, j, i+1) = pred_r + stencil_mean[c];
+                        view.fyR(c, q, 0, j, i) = pred_d + stencil_mean[c];
+                        view.fyL(c, q, 0, j+1, i) = pred_u + stencil_mean[c];
                     }
                 }
             }
@@ -520,6 +669,11 @@ void Space_solve(Simulation& Sim) {
             }
             if constexpr (AETHER_DIM > 2) {
                 FOG_sweep<sweep_dir::z>(Sim);
+            }
+            break;
+        case solver::gp:
+            if constexpr (AETHER_DIM == 2) {
+                gp_2d(Sim);
             }
             break;
 

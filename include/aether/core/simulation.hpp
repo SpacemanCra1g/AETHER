@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <cmath>
 #include <aether/core/config.hpp>
 #include <aether/core/config_build.hpp>
 #include <aether/core/Kokkos_Policy.hpp>
@@ -178,12 +179,16 @@ template<>
 struct SimulationD<2> {
     static constexpr int dim = 2;
     static constexpr int numvar = aether::phys_ct::numvar;
+    static constexpr int gp_stencil_radius = 1;  // 7x7 stencil
+    static constexpr int gp_matrix_size = gp_stencil_radius * 2 + 1;    // (2*1+1)^2 = 9
 
     using policy_type = aether::kokkos_cfg::Policy<2, AETHER_PHYSICS_KIND>;
 
     using CellView = typename policy_type::template CellView<double>;
     using DirView  = typename policy_type::template DirCellView<double>;
     using FaceView = typename policy_type::template FaceView<double>;
+    using MatView  = Kokkos::View<double**>;
+    using VecView  = Kokkos::View<double*>;
 
     Config cfg{};
     TimeState time{};
@@ -205,6 +210,12 @@ struct SimulationD<2> {
     FaceView fyR{};
     FaceView fy{};
     bool ctu_enabled{false};
+
+    MatView gp_L_mat{};
+    VecView gp_k_star_l{};
+    VecView gp_k_star_r{};
+    VecView gp_k_star_u{};
+    VecView gp_k_star_d{};
 
     std::array<sweep_dir, 2> sweeps{ sweep_dir::x, sweep_dir::y };
 
@@ -230,6 +241,12 @@ struct SimulationD<2> {
         FaceView fyL;
         FaceView fyR;
         FaceView fy;
+
+        MatView gp_L_mat;
+        VecView gp_k_star_l;
+        VecView gp_k_star_r;
+        VecView gp_k_star_u;
+        VecView gp_k_star_d;
     };
 
     SimulationD() = default;
@@ -250,8 +267,15 @@ struct SimulationD<2> {
           fyL("fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          ctu_enabled(compute_ctu_enabled(config))
-    {}
+          ctu_enabled(compute_ctu_enabled(config)),
+          gp_L_mat("gp_K_mat", gp_matrix_size, gp_matrix_size),
+          gp_k_star_l("gp_k_star_l", gp_matrix_size),
+          gp_k_star_r("gp_k_star_r", gp_matrix_size),
+          gp_k_star_u("gp_k_star_u", gp_matrix_size),
+          gp_k_star_d("gp_k_star_d", gp_matrix_size)
+    {
+        init_gp_matrices(config);
+    }
 
     [[nodiscard]] AETHER_INLINE
     View view() const noexcept {
@@ -272,8 +296,126 @@ struct SimulationD<2> {
             fx,
             fyL,
             fyR,
-            fy
+            fy,
+            gp_L_mat,
+            gp_k_star_l,
+            gp_k_star_r,
+            gp_k_star_u,
+            gp_k_star_d,
         };
+    }
+
+    void cholesky_inplace(MatView& A) noexcept {
+        const int n = A.extent(0);
+        using execution_space = typename MatView::execution_space;
+        
+        for (int i = 0; i < n; ++i) {
+            // Compute diagonal element L(i,i)
+            // L(i,i) = sqrt(A(i,i) - sum_{k=0}^{i-1} L(i,k)^2)
+            double diag_sum = A(i, i);
+            for (int k = 0; k < i; ++k) {
+                diag_sum -= A(i, k) * A(i, k);
+            }
+            A(i, i) = std::sqrt(diag_sum);
+            
+            // Compute off-diagonal elements L(j,i) for j > i in parallel
+            // L(j,i) = (A(j,i) - sum_{k=0}^{i-1} L(j,k)*L(i,k)) / L(i,i)
+            const double aii = A(i, i);
+            
+            Kokkos::parallel_for(
+                Kokkos::RangePolicy<execution_space>(i + 1, n),
+                KOKKOS_LAMBDA(const int j) {
+                    double sum = A(j, i);
+                    for (int k = 0; k < i; ++k) {
+                        sum -= A(j, k) * A(i, k);
+                    }
+                    A(j, i) = sum / aii;
+                }
+            );
+        }
+    }
+
+    void init_gp_matrices(const Config& config) noexcept {
+        for (int i = 0; i < gp_matrix_size; ++i) {
+            for (int j = 0; j < gp_matrix_size; ++j) {
+                int ix = (i % (2*gp_stencil_radius+1)) - gp_stencil_radius;
+                int iy = (i / (2*gp_stencil_radius+1)) - gp_stencil_radius;
+
+                int jx = (j % (2*gp_stencil_radius+1)) - gp_stencil_radius;
+                int jy = (j / (2*gp_stencil_radius+1)) - gp_stencil_radius;
+
+
+                gp_L_mat(i, j) = compute_gp_weight_ell1_2d(ix, iy, jx, jy);
+            }
+            // Add nugget to diagonal for numerical stability
+            gp_L_mat(i, i) += 1e-2;
+        }
+        
+        cholesky_inplace(gp_L_mat);
+        
+        for (int i = 0; i < gp_matrix_size; ++i) {
+            int ix = (i % (2*gp_stencil_radius+1)) - gp_stencil_radius;
+            int iy = (i / (2*gp_stencil_radius+1)) - gp_stencil_radius;
+
+            gp_k_star_l(i) = compute_gp_weight_ell2_2d(ix, iy, -0.5, 0.0);
+            gp_k_star_r(i) = compute_gp_weight_ell2_2d(ix, iy, 0.5, 0.0);
+            gp_k_star_u(i) = compute_gp_weight_ell2_2d(ix, iy, 0.0, 0.5);
+            gp_k_star_d(i) = compute_gp_weight_ell2_2d(ix, iy, 0.0, -0.5);
+        }
+    }
+
+    // From GP Recipe paper, this is an exact 
+    // float compute_gp_weight_ell1_2d(float ix, float iy, float jx, float jy) const noexcept {
+    //     float ell = 6.0;  // length scale TODO: make modifiable via config
+    //     float ell_sq = ell * ell;
+    //     float ell_sqrt_2 = ell * std::sqrt(2.0);
+    //     float delta_x = ix - jx;
+    //     float delta_y = iy - jy;
+
+    //     float x_contrib = ell_sq * (
+    //         (delta_x + 1) / ell_sqrt_2 * std::erf((delta_x + 1) / ell_sqrt_2) + (delta_x - 1) / ell_sqrt_2 * std::erf((delta_x - 1) / ell_sqrt_2) +
+    //         (1.0 / std::sqrt(M_PI)) * (std::exp(-0.5 * (delta_x + 1) * (delta_x + 1) / ell_sq) + std::exp(-0.5 * (delta_x - 1) * (delta_x - 1) / ell_sq)) +
+    //         -2.0 * ((delta_x / ell_sqrt_2) * std::erf(delta_x / ell_sqrt_2) + (1.0 / std::sqrt(M_PI)) * std::exp(-0.5 * delta_x * delta_x / ell_sq))
+    //     );
+    //     float y_contrib = ell_sq * (
+    //         (delta_y + 1) / ell_sqrt_2 * std::erf((delta_y + 1) / ell_sqrt_2) + (delta_y - 1) / ell_sqrt_2 * std::erf((delta_y - 1) / ell_sqrt_2) +
+    //         (1.0 / std::sqrt(M_PI)) * (std::exp(-0.5 * (delta_y + 1) * (delta_y + 1) / ell_sq) + std::exp(-0.5 * (delta_y - 1) * (delta_y - 1) / ell_sq)) +
+    //         -2.0 * ((delta_y / ell_sqrt_2) * std::erf(delta_y / ell_sqrt_2) + (1.0 / std::sqrt(M_PI)) * std::exp(-0.5 * delta_y * delta_y / ell_sq))
+    //     );
+
+    //     return M_PI * x_contrib * y_contrib;
+    // }
+
+    // Standard Squared Exponential (SE) kernel
+    float compute_gp_weight_ell1_2d(float ix, float iy, float jx, float jy) const noexcept {
+        float ell = 6.0;  // length scale TODO: make modifiable via config
+        float sigma_sq = 1.0;  // signal variance
+        float delta_x = ix - jx;
+        float delta_y = iy - jy;
+        float dist_sq = delta_x * delta_x + delta_y * delta_y;
+        return sigma_sq * std::exp(-0.5 * dist_sq / (ell * ell));
+    }
+
+    // float compute_gp_weight_ell2_2d(float ix, float iy, float jx, float jy) const noexcept {
+    //     float ell = 6.0;  // length scale TODO: make modifiable via config
+    //     float ell_sqrt_2 = ell * std::sqrt(2.0);
+    //     float delta_x = ix - jx;
+    //     float delta_y = iy - jy;
+
+    //     float x_contrib = ell * std::erf((delta_x + 0.5)/ell_sqrt_2) - std::erf((delta_x - 0.5)/ell_sqrt_2);
+    //     float y_contrib = ell * std::erf((delta_y + 0.5)/ell_sqrt_2) - std::erf((delta_y - 0.5)/ell_sqrt_2);
+
+    //     return M_PI * 0.5 * x_contrib * y_contrib;
+    // }
+
+    // Standard Squared Exponential (SE) kernel for prediction points
+    float compute_gp_weight_ell2_2d(float ix, float iy, float jx, float jy) const noexcept {
+        float ell = 6.0;  // length scale TODO: make modifiable via config
+        float sigma_sq = 1.0;  // signal variance
+        float delta_x = ix - jx;
+        float delta_y = iy - jy;
+        float dist_sq = delta_x * delta_x + delta_y * delta_y;
+        return sigma_sq * std::exp(-0.5 * dist_sq / (ell * ell));
     }
 
 private:

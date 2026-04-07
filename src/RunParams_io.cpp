@@ -170,6 +170,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     else if (space_solver_lower == "weno5"){
       cfg.solve= aether::core::solver::weno5; return true;
     }
+    else if (space_solver_lower == "gp"){
+      cfg.solve= aether::core::solver::gp; return true;
+    }
     else {
       throw std::runtime_error("Unknown Space Solver selection " + space_solver_lower);
       return false;

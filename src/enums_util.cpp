@@ -20,6 +20,7 @@ std::string_view to_string(solver r){
         case(solver::ppm) : return "ppm";
         case(solver::weno3) : return "weno3";
         case(solver::weno5) : return "weno5";
+        case(solver::gp) : return "gp";
         default: return "unknown";
     }
 }

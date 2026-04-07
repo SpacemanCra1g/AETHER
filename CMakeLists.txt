@@ -200,6 +200,9 @@ function(aether_enable_sanitizers_for TARGET_NAME)
   endif()
 endfunction()
 
+# ---- Find LAPACK for Cholesky decomposition ----
+find_package(LAPACK REQUIRED)
+
 # ---- Core library target -----------------------------------------------------
 add_library(aether_core)
 
@@ -223,6 +226,7 @@ target_link_libraries(aether_core
     aether_compile_options
   PUBLIC
     Kokkos::kokkos
+    LAPACK::LAPACK
 )
 
 target_compile_options(aether_core PRIVATE
