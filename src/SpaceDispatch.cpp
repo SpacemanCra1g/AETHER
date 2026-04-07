@@ -41,7 +41,7 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
             for (int c = 0; c < numvar; ++c) {
                 const double u = prim(c, k, j, i);
                 for (int q = 0; q < quad; ++q) {
-                    FR(c, q, k,     j,     i    ) = u;
+                    FR(c, q, k     , j     , i     ) = u;
                     FL(c, q, k + k0, j + j0, i + i0) = u;
                 }
             }

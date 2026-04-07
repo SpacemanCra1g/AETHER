@@ -354,6 +354,13 @@ struct SimulationD<3> {
     FaceView ctu_fzR{};
     FaceView ctu_fz{};
 
+    FaceView ctu_xL_bak{};
+    FaceView ctu_xR_bak{};
+    FaceView ctu_yL_bak{};
+    FaceView ctu_yR_bak{};
+    FaceView ctu_zL_bak{};
+    FaceView ctu_zR_bak{};
+
     std::array<sweep_dir, 3> sweeps{ sweep_dir::x, sweep_dir::y, sweep_dir::z };
 
     struct View {
@@ -399,6 +406,13 @@ struct SimulationD<3> {
         FaceView fzL;
         FaceView fzR;
         FaceView fz;
+
+        FaceView xL_bak;
+        FaceView xR_bak;
+        FaceView yL_bak;
+        FaceView yR_bak;
+        FaceView zL_bak;
+        FaceView zR_bak;
     };
 
     SimulationD() = default;
@@ -437,6 +451,15 @@ struct SimulationD<3> {
             ctu_fzL = FaceView("ctu_fzL", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
             ctu_fzR = FaceView("ctu_fzR", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
             ctu_fz  = FaceView("ctu_fz",  numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+
+            ctu_xL_bak = FaceView("ctu_xL_bak", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_xR_bak = FaceView("ctu_xR_bak", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+
+            ctu_yL_bak = FaceView("ctu_yL_bak", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_yR_bak = FaceView("ctu_yR_bak", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+
+            ctu_zL_bak = FaceView("ctu_zL_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_zR_bak = FaceView("ctu_zR_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
         }
     }
 
@@ -473,7 +496,10 @@ struct SimulationD<3> {
             ctu_enabled,
             ctu_fxL, ctu_fxR, ctu_fx,
             ctu_fyL, ctu_fyR, ctu_fy,
-            ctu_fzL, ctu_fzR, ctu_fz
+            ctu_fzL, ctu_fzR, ctu_fz,
+            ctu_xL_bak, ctu_xR_bak,
+            ctu_yL_bak, ctu_yR_bak,
+            ctu_zL_bak, ctu_zR_bak
         };
     }
 
