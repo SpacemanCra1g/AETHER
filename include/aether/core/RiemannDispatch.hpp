@@ -173,7 +173,6 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
     Kokkos::parallel_for(
         "Riemann_sweep",
-        // TODO::: THIS IS CHANGED TO HALO2
         face_halo1<dir>(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             const double gamma = gamma_P;
@@ -208,17 +207,6 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                 }
                 R.p   = FR(P::P, q, k, j, i);
 
-//                 if (!(L.rho > 0.0) || !(R.rho > 0.0) || !(L.p >= 0.0) || !(R.p >= 0.0) ||
-//     !std::isfinite(L.rho) || !std::isfinite(R.rho) || !std::isfinite(L.p) || !std::isfinite(R.p)) {
-//     printf("BAD RIEMANN INPUT dir=%d k=%d j=%d i=%d q=%d | "
-//            "L=(rho=%e p=%e vx=%e vy=%e vz=%e) "
-//            "R=(rho=%e p=%e vx=%e vy=%e vz=%e)\n",
-//            int(dir), k, j, i, q,
-//            L.rho, L.p, L.vx, L.vy, L.vz,
-//            R.rho, R.p, R.vx, R.vy, R.vz);
-//     Kokkos::abort("bad riemann input");
-// }
-
                 if constexpr (solv == riemann::hll) {
                     F = hll(L, R, gamma);
                 }
@@ -245,27 +233,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 template<class Sim, class V>
 void Riemann_dispatch(Sim& sim, V& v) {
     auto view = sim.view();
-auto prim = view.prim;
-
-Kokkos::parallel_for(
-    "check_prim",
-    loop::cells_full(sim),
-    KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const double rho = prim(P::RHO,k,j,i);
-        const double p   = prim(P::P  ,k,j,i);
-
-        // if (!(rho > 0.0) || !(p >= 0.0) || !std::isfinite(rho) || !std::isfinite(p)) {
-        //     printf("BAD PRIM at k=%d j=%d i=%d | rho=%e vx=%e vy=%e vz=%e p=%e\n",
-        //            k,j,i,
-        //            prim(P::RHO,k,j,i),
-        //            prim(P::VX ,k,j,i),
-        //            prim(P::VY ,k,j,i),
-        //            prim(P::VZ ,k,j,i),
-        //            prim(P::P  ,k,j,i));
-        //     Kokkos::abort("bad primitive state before Riemann");
-        // }
-    }
-);
+    auto prim = view.prim;
 
     switch (sim.cfg.riem) {
         case riemann::hll:

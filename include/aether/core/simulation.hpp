@@ -17,6 +17,10 @@ struct SimulationD;
 // Shared runtime metadata
 // ============================================================
 
+static AETHER_INLINE bool compute_ctu_enabled(const Config& c) noexcept {
+    return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm );
+}
+
 struct TimeState {
     double dt{0.0};
     double t_start{0.0};
@@ -71,6 +75,7 @@ struct SimulationD<1> {
     FaceView fxL{};
     FaceView fxR{};
     FaceView fx{};
+    bool ctu_enabled{false};
 
     std::array<sweep_dir, 1> sweeps{ sweep_dir::x };
 
@@ -106,7 +111,8 @@ struct SimulationD<1> {
           chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
           fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx)
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          ctu_enabled(compute_ctu_enabled(config))
     {}
 
     [[nodiscard]] AETHER_INLINE
@@ -196,6 +202,7 @@ struct SimulationD<2> {
     FaceView fyL{};
     FaceView fyR{};
     FaceView fy{};
+    bool ctu_enabled{false};
 
     std::array<sweep_dir, 2> sweeps{ sweep_dir::x, sweep_dir::y };
 
@@ -240,7 +247,8 @@ struct SimulationD<2> {
           fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fyL("fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx)
+          fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          ctu_enabled(compute_ctu_enabled(config))
     {}
 
     [[nodiscard]] AETHER_INLINE
@@ -541,9 +549,7 @@ private:
         return t;
     }
 
-    static AETHER_INLINE bool compute_ctu_enabled(const Config& c) noexcept {
-        return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm );
-    }
+
 };
 
 // ============================================================

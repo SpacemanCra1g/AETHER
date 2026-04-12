@@ -72,7 +72,6 @@ EigenvectorsT(const int num_cells){
     }
     return v;
 }
-
 };
 
 struct one_cell_spectral_container{

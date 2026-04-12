@@ -418,7 +418,6 @@ void fill_eigenvectors(
 }
 
 void calc_eigenvecs(aether::core::CellView prim_view,
-                    aether::core::eigenvec_view eigs,
                     const double gamma);
 
 } // namespace aether::physics::euler
