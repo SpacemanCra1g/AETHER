@@ -10,6 +10,29 @@ namespace aether::loops {
 template<class Sim>
 using exec_space_t = typename Sim::policy_type::execution_space;
 
+
+template<class Sim>
+auto cells_halo3(const Sim& sim) {
+    using exec_space = exec_space_t<Sim>;
+    int i0 = sim.cells.ibegin() -3;
+    int iN = sim.cells.iend() + 3;
+    int j0 = sim.cells.jbegin();
+    int jN = sim.cells.jend();
+    int k0 = sim.cells.kbegin();
+    int kN = sim.cells.kend();
+    if constexpr (AETHER_DIM > 1) {
+    j0 -= 3; jN += 3;
+    }
+    if constexpr (AETHER_DIM > 2) {
+    k0 -= 3; kN += 3;
+    }
+    return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+        {k0, j0, i0},
+        {kN, jN, iN}
+    );
+}
+
+
 template<class Sim>
 auto cells_halo2(const Sim& sim) {
     using exec_space = exec_space_t<Sim>;

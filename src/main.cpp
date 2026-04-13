@@ -14,7 +14,7 @@
 #include <omp.h>
 
 int main() {
-    // feenableexcept(FE_INVALID);
+    feenableexcept(FE_INVALID);
     using namespace aether::core;
     {
         Kokkos::initialize();
@@ -61,6 +61,7 @@ int main() {
         // std::cout << "\n";
 
         int count = 0;
+    
         do {
             count++;
             aether::phys::set_dt(sim);
@@ -70,7 +71,8 @@ int main() {
             Time_stepper(sim);
             boundary_conditions(sim, domain.cons);
             aether::phys::cons_to_prims_domain(sim);
-        } while (sim.time.t < sim.time.t_end && count < 2);
+        } while (sim.time.t < sim.time.t_end );
+    
 
         std::cout << "The final time is " << sim.time.t << "\n";
         aether::io::snapshot_request snap;

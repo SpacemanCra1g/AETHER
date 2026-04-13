@@ -44,7 +44,7 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
     Kokkos::parallel_for(
         "FOG_sweep",
         // TODO:: This should be a 1 cell halo ring
-        loop::cells_full(sim),
+        loop::cells_halo1(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             for (int c = 0; c < numvar; ++c) {
                 const double u = prim(c, k, j, i);
@@ -57,7 +57,7 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
     );
 }
 
-template<limiter TVD, class Sim>
+template<limiter TVD, int dim, class Sim>
 AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
     constexpr int numvar = aether::phys_ct::numvar;
 
@@ -65,13 +65,16 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
     auto prim = view.prim;
 
     double inv_dx = 1.0/view.dx;
+    double inv_dy = 1.0/view.dy;
     double dtx = view.dt * inv_dx;
+    
 
     Kokkos::parallel_for(
         "PLM_sweep",
         // TODO:: This should be a 1 cell halo ring
         loops::cells_halo2(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            double dty = view.dt * inv_dy;
             vec p_vec, p_vec_L, p_vec_R;
             prims p;
             chars Eigs;
@@ -90,11 +93,11 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
             vec d_w;
 
             if constexpr (TVD == limiter::minmod) {
-                d_w =  minmod( inv_dx*Eigs.x.left *(p_vec - p_vec_L), inv_dx*Eigs.x.left *(p_vec_R - p_vec) );
+                d_w =  minmod( Eigs.x.left *(p_vec - p_vec_L), Eigs.x.left *(p_vec_R - p_vec) );
             } else if constexpr (TVD == limiter::mc) {
-                d_w = Eigs.x.left * mc( 0.5*inv_dx*(p_vec_R - p_vec_L) , 2.0*inv_dx*(p_vec_R - p_vec), 2.0*inv_dx*(p_vec - p_vec_L)) ;
+                d_w = mc( 0.5*Eigs.x.left * (p_vec_R - p_vec_L) , 2.0*Eigs.x.left * (p_vec_R - p_vec), 2.0*Eigs.x.left * (p_vec - p_vec_L)) ;
             } else if constexpr (TVD == limiter::vanleer) {
-                d_w = Eigs.x.left * van_leer(inv_dx*(p_vec - p_vec_L), inv_dx*(p_vec_R - p_vec));
+                d_w =  van_leer(Eigs.x.left *(p_vec - p_vec_L), Eigs.x.left *(p_vec_R - p_vec));
             }
 
             p_vec_L = p_vec;
@@ -116,6 +119,43 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                 }
             }
 
+            // These are the y-sweeps for PLM
+            if constexpr (dim > 1) {
+                for (int c = 0; c < numvar; ++c) {
+                    p_vec_L[c] = prim(c,k,j-1,i);
+                    p_vec_R[c] = prim(c,k,j+1,i);
+            }
+
+            if constexpr (TVD == limiter::minmod) {
+                d_w =  minmod( Eigs.y.left *(p_vec - p_vec_L), Eigs.y.left *(p_vec_R - p_vec) );
+            } else if constexpr (TVD == limiter::mc) {
+                d_w = mc( 0.5*Eigs.y.left * (p_vec_R - p_vec_L) , 2.0*Eigs.y.left * (p_vec_R - p_vec), 2.0*Eigs.y.left * (p_vec - p_vec_L)) ;
+            } else if constexpr (TVD == limiter::vanleer) {
+                d_w =  van_leer(Eigs.y.left *(p_vec - p_vec_L), Eigs.y.left *(p_vec_R - p_vec));
+            }
+
+            p_vec_L = p_vec;
+            p_vec_R = p_vec;
+
+            for (int c = 0; c < P::COUNT; c++){
+                double eig = Eigs.y.lambda(c);
+                if (eig >= 0.0){
+                    p_vec_R += 0.5*(1.0 - eig*dty)*d_w[c]*col(Eigs.y.right,c);
+                } else {
+                    p_vec_L += 0.5*(-1.0 - eig*dty)*d_w[c]*col(Eigs.y.right,c);
+                }
+            }
+
+            for (int c = 0; c < numvar; ++c) {
+                for (int q = 0; q < view.quad; ++q) {
+                    view.fyR(c, q, k, j, i) = p_vec_L[c];
+                    view.fyL(c, q, k, j+1, i) = p_vec_R[c];
+                }
+            }
+
+            
+            }
+
         }   
     );
 }
@@ -135,7 +175,7 @@ void Space_solve(Simulation& Sim) {
             break;
         
         case solver::plm:
-            PLM_sweep<limiter::minmod>(Sim);
+            PLM_sweep<limiter::vanleer, AETHER_DIM>(Sim);
             break;
         default:
             throw std::runtime_error("Space_solve: unknown space solver");
