@@ -358,6 +358,14 @@ namespace aether::math {
         return M * s;
     }
 
+    template<int N>
+    KOKKOS_INLINE_FUNCTION
+    Vec<N> col(Mat<N>& A, int j){
+        Vec<N> v;
+        for (int i = 0; i < N; ++i) v[i] = A(i,j);
+        return v;
+    }
+
     // Helpful aliases if you want them
     template<int Size>
     using Max = Mat<Size>;

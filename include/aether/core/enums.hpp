@@ -9,4 +9,5 @@ namespace aether::core {
     enum class boundary_conditions : std::uint8_t {Outflow = 1, Periodic = 2, Reflecting = 3};
     // enum class OutputType : std::uint8_t {text=0,ascii=1,hdf5=2};
     enum class sweep_dir : std::uint8_t {x=0,y=1,z=2};
+    enum class limiter : std::uint8_t{minmod=0, mc=1, vanleer=2};
 }

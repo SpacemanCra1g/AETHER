@@ -2,7 +2,6 @@
 add_library(aether_phys_euler STATIC
   active_impl.cpp
   convert.cpp
-  pop_eigs.cpp
   # add more Euler-specific .cpp here
 )
 

@@ -1,0 +1,10 @@
+First time build instructions for AETHER
+
+
+After cloning the repo you must pull in kokkos.
+This is linked as a git submodule in the tpls/kokkos dir.
+To pull in this module run
+
+<git submodule update --init --recursive>
+
+Then verify that tpls/kokkos is populated

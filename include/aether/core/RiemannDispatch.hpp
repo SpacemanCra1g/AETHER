@@ -43,70 +43,6 @@ struct VelMap<sweep_dir::z> {
 };
 
 // ============================================================
-// Face loop bounds
-// Rank-3 always: (k,j,i)
-// ============================================================
-template<sweep_dir dir, class Sim>
-auto face_halo1(const Sim& sim) {
-    using exec_space = typename Sim::policy_type::execution_space;
-
-    if constexpr (dir == sweep_dir::x) {
-        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            { (Sim::dim > 2 ? 1 : 0), (Sim::dim > 1 ? 1 : 0), 1 },
-            { sim.xfaces.Nz - (Sim::dim > 2 ? 1 : 0),
-              sim.xfaces.Ny - (Sim::dim > 1 ? 1 : 0),
-              sim.xfaces.Nfx - 1 }
-        );
-    }
-    else if constexpr (dir == sweep_dir::y) {
-        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            { (Sim::dim > 2 ? 1 : 0), 1, (Sim::dim > 1 ? 1 : 0) },
-            { sim.yfaces.Nz - (Sim::dim > 2 ? 1 : 0),
-              sim.yfaces.Nfy - 1,
-              sim.yfaces.Nx - 1 }
-        );
-    }
-    else {
-        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            { 1, 1, 1 },
-            { sim.zfaces.Nfz - 1,
-              sim.zfaces.Ny  - 1,
-              sim.zfaces.Nx  - 1 }
-        );
-    }
-}
-
-template<sweep_dir dir, class Sim>
-auto face_halo2(const Sim& sim) {
-    using exec_space = typename Sim::policy_type::execution_space;
-
-    if constexpr (dir == sweep_dir::x) {
-        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            { (Sim::dim > 2 ? 2 : 0), (Sim::dim > 1 ? 2 : 0), 2 },
-            { sim.xfaces.Nz - (Sim::dim > 2 ? 2 : 0),
-              sim.xfaces.Ny - (Sim::dim > 1 ? 2 : 0),
-              sim.xfaces.Nfx - 2 }
-        );
-    }
-    else if constexpr (dir == sweep_dir::y) {
-        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            { (Sim::dim > 2 ? 2 : 0), 2, (Sim::dim > 1 ? 2 : 0) },
-            { sim.yfaces.Nz - (Sim::dim > 2 ? 2 : 0),
-              sim.yfaces.Nfy - 2,
-              sim.yfaces.Nx - 2 }
-        );
-    }
-    else {
-        return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-            { 2, 2, 2 },
-            { sim.zfaces.Nfz - 2,
-              sim.zfaces.Ny  - 2,
-              sim.zfaces.Nx  - 2 }
-        );
-    }
-}
-
-// ============================================================
 // Select the face-state buffers for a sweep
 // ============================================================
 
@@ -173,7 +109,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
     Kokkos::parallel_for(
         "Riemann_sweep",
-        face_halo1<dir>(sim),
+        aether::loops::face_halo1<dir>(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             const double gamma = gamma_P;
             for (int q = 0; q < quad; ++q) {
