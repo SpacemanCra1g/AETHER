@@ -44,7 +44,7 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
     Kokkos::parallel_for(
         "FOG_sweep",
         // TODO:: This should be a 1 cell halo ring
-        loop::cells_halo1(sim),
+        loop::cells_full(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             for (int c = 0; c < numvar; ++c) {
                 const double u = prim(c, k, j, i);

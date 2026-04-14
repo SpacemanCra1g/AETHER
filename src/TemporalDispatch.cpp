@@ -21,7 +21,7 @@ void Time_stepper(Simulation& sim){
         
         case time_stepper::char_trace:
             Space_solve(sim);
-            if (sim.ctu_enabled) CTU_correction(sim);
+            // if (sim.ctu_enabled) CTU_correction(sim);
             Riemann_dispatch(sim, domain);
             flux_diff_sweep(domain.prim, sim);
             axpy(domain.cons, -1.0, domain.prim);
