@@ -193,7 +193,7 @@ static AETHER_INLINE void write_plaintext_snapshot(aether::core::Simulation& sim
         throw std::runtime_error("Failed to open " + path);
     }
 
-    auto prim_h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sim.prim);
+    auto prim_h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sim.view().prim);
 
     write_plaintext_header(f, sim);
     write_plaintext_column_header(f);

@@ -109,7 +109,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
     Kokkos::parallel_for(
         "Riemann_sweep",
-        aether::loops::face_halo1<dir>(sim),
+        aether::loops::face_halo2<dir>(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             const double gamma = gamma_P;
             for (int q = 0; q < quad; ++q) {

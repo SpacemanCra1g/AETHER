@@ -66,45 +66,32 @@ AETHER_INLINE void outflow_bc(Sim& sim, typename Sim::CellView var) {
 
         // X ghost slabs: all j, ghost i
         Kokkos::parallel_for(
-            "bc_outflow_2d_xleft",
-            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-                {0, 0, 0}, {numvar, sim.cells.Ny, ng}
+            "Dim=2 Outflow BCs",
+            Kokkos::MDRangePolicy<exec_space,Kokkos::Rank<2>>(
+                {0,0},{sim.cells.Ny,sim.cells.Nx}
             ),
-            KOKKOS_LAMBDA(const int c, const int j, const int g) {
-                const int sj = clamp_index(j, jb, je);
-                var(c, 0, j, g) = var(c, 0, sj, ib);
-            }
-        );
+            KOKKOS_LAMBDA(const int j, const int i){
+                if (j < jb && i >= ib && i < ie) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,jb,i);
+                } else if (j >= je && i >= ib && i < ie) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,je-1,i);
+                } // This concludes the j sweep. Now for the i's                
+                else if (i < ib && j >= jb && j < je) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,j,ib);
+                } else if (i >= ie && j >= jb && j < je) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,j,ie-1);
+                }
+                // Now we sweep the corners 
+                else if (i < ib && j < jb){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,jb,ib);
+                } else if (i < ib && j >= je){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,je-1,ib);
+                } else if (i >= ie && j >= je){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,je-1,ie-1);
+                } else if (i >= ie && j < jb){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,jb,ie-1);
+                }
 
-        Kokkos::parallel_for(
-            "bc_outflow_2d_xright",
-            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-                {0, 0, 0}, {numvar, sim.cells.Ny, ng}
-            ),
-            KOKKOS_LAMBDA(const int c, const int j, const int g) {
-                const int sj = clamp_index(j, jb, je);
-                var(c, 0, j, ie + g) = var(c, 0, sj, ie - 1);
-            }
-        );
-
-        // Y ghost slabs: interior i only, ghost j
-        Kokkos::parallel_for(
-            "bc_outflow_2d_yleft",
-            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-                {0, 0, ib}, {numvar, ng, ie}
-            ),
-            KOKKOS_LAMBDA(const int c, const int g, const int i) {
-                var(c, 0, g, i) = var(c, 0, jb, i);
-            }
-        );
-
-        Kokkos::parallel_for(
-            "bc_outflow_2d_yright",
-            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
-                {0, 0, ib}, {numvar, ng, ie}
-            ),
-            KOKKOS_LAMBDA(const int c, const int g, const int i) {
-                var(c, 0, je + g, i) = var(c, 0, je - 1, i);
             }
         );
     }

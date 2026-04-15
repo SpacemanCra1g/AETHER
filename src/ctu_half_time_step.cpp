@@ -185,8 +185,8 @@ void ctu_half_time_correction<2>(Simulation& sim, Simulation::View view) {
     Kokkos::parallel_for(
         "ctu_half_time_correction_2d",
         Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
-            {jb - 1, ib - 1},
-            {je + 1, ie + 1}
+            {jb-1, ib-1},
+            {je+1, ie+1}
         ),
         KOKKOS_LAMBDA(const int j, const int i) {
             for (int q = 0; q < quad; ++q) {

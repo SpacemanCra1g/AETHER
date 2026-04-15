@@ -1,3 +1,5 @@
+#include "Kokkos_Core_fwd.hpp"
+#include "aether/core/enums.hpp"
 #include "aether/physics/euler/convert.hpp"
 #include "impl/Kokkos_InitializeFinalize.hpp"
 #include <Kokkos_Core.hpp>
@@ -32,33 +34,6 @@ int main() {
 
         aether::phys::prims_to_cons_domain(sim);
 
-        // aether::core::one_cell_spectral_container chars;
-        // aether::math::Vec<aether::phys_ct::numvar> vec;
-
-        // vec.data[0] = domain.prim(0,0,50,50);
-        // vec.data[1] = domain.prim(1,0,50,50) + 1.2;        
-        // vec.data[2] = domain.prim(2,0,50,50);        
-        // vec.data[3] = domain.prim(3,0,50,50);   
-        // vec.data[4] = domain.prim(4,0,50,50);   
-        
-        // aether::phys::prims P;
-        // P.rho = domain.prim(0,0,50,50);
-        // P.vx = domain.prim(1,0,50,50) + 1.2;
-        // P.vy = domain.prim(2,0,50,50);
-        // P.vz = domain.prim(3,0,50,50);
-        // P.p = domain.prim(4,0,50,50);
-
-        // aether::physics::euler::fill_eigenvectors(P, chars, domain.gamma);
-
-        // std::cout << std::sqrt(domain.gamma*P.p/P.rho) << "\n";
-        // for (int i = 0; i < 5; ++i) std::cout << chars.y.eigs[i] << " ";
-        // std::cout << "\n";
-        // auto w = chars.y.left * vec;
-        // for (int i = 0; i < 5; ++i) std::cout << w[i] << " ";
-        // std::cout << "\n";
-        // auto q = chars.y.right * w;
-        // for (int i = 0; i < 5; ++i) std::cout << q[i] << " ";
-        // std::cout << "\n";
 
         int count = 0;
     
@@ -71,10 +46,38 @@ int main() {
             Time_stepper(sim);
             boundary_conditions(sim, domain.cons);
             aether::phys::cons_to_prims_domain(sim);
-        } while (sim.time.t < sim.time.t_end );
+        } while (sim.time.t < sim.time.t_end ); 
     
-
         std::cout << "The final time is " << sim.time.t << "\n";
+    //     boundary_conditions(sim,domain.cons);
+    //     boundary_conditions(sim,domain.prim);
+    //     boundary_conditions(sim,sim.view().prim);
+    //     Kokkos::fence();
+
+
+    //     auto v = sim.view().prim;
+    // auto h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), v);
+
+    // int j;
+    // const int ib = sim.cells.ibegin();
+    // const int ie = sim.cells.iend();
+
+    // for (j = 100; j < 104; j++){
+    // std::cout << "j = " << j << "\n";
+    // std::cout << "ib=" << ib << " ie=" << ie << "\n";
+    // std::cout << "srcL  " << h(P::RHO,0,j,ib)   << "\n";
+    // std::cout << "gL0   " << h(P::RHO,0,j,0)    << "\n";
+    // std::cout << "gL1   " << h(P::RHO,0,j,1)    << "\n";
+    // std::cout << "gL2   " << h(P::RHO,0,j,2)    << "\n";
+    // std::cout << "srcR  " << h(P::RHO,0,j,ie-1) << "\n";
+    // std::cout << "gR0   " << h(P::RHO,0,j,ie)   << "\n";
+    // std::cout << "gR1   " << h(P::RHO,0,j,ie+1) << "\n";
+    // std::cout << "gR2   " << h(P::RHO,0,j,ie+2) << "\n";
+    // std::cout << "\n";
+
+    // }
+
+
         aether::io::snapshot_request snap;
         snap.formats.push_back(aether::io::output_format::plain_txt);
         snap.output_dir = "Output";
