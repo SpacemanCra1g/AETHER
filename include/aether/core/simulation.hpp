@@ -18,7 +18,7 @@ struct SimulationD;
 // ============================================================
 
 static AETHER_INLINE bool compute_ctu_enabled(const Config& c) noexcept {
-    return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm );
+    return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm || c.solve == solver::ppm);
 }
 
 struct TimeState {

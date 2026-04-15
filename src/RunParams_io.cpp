@@ -491,7 +491,16 @@ void check_run_parameters(Config& cfg) {
             throw std::runtime_error("Config error: solver::plm requires at least 3 ghost cells for 2D CTU");
           }
         }
-    }
+    } else if (cfg.solve == solver::ppm) {
+        if (cfg.num_ghost < 4) {
+            throw std::runtime_error("Config error: solver::ppm requires num_ghost >= 4.");
+        }
+        if (AETHER_DIM > 1){
+          if (cfg.num_ghost < 3) {
+            throw std::runtime_error("Config error: solver::ppm requires at least 4 ghost cells for 2D CTU");
+          }
+        }
+    } else {throw std::runtime_error("Config error: ghost requirements not specified for this solver");}
 
 }
 };
