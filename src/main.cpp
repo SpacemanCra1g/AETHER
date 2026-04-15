@@ -26,17 +26,20 @@ int main() {
         boundary_conditions(sim, domain.prim);
 
         aether::phys::prims_to_cons_domain(sim);
+        if( sim.cfg.solve == solver::fog){
+            std::cout << "FOG \n";
+        };
 
-        do {
+        // do {
             aether::phys::set_dt(sim);
             std::cout << "The time step is " << sim.time.dt
                       << " The current time is " << sim.time.t << "\n";
 
             Time_stepper(sim);
-            aether::phys::cons_to_prims_domain(sim);
-            boundary_conditions(sim, domain.prim);
-            aether::phys::prims_to_cons_domain(sim);
-        } while (sim.time.t < sim.time.t_end ); 
+        //     aether::phys::cons_to_prims_domain(sim);
+        //     boundary_conditions(sim, domain.prim);
+        //     aether::phys::prims_to_cons_domain(sim);
+        // } while (sim.time.t < sim.time.t_end ); 
     
         std::cout << "The final time is " << sim.time.t << "\n";
     
