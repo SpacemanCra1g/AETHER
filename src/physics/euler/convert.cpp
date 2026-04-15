@@ -18,7 +18,7 @@ void cons_to_prims_domain(aether::core::Simulation &sim){
 
     Kokkos::parallel_for(
         "Cons_to_prims_domain" 
-        , loop::cells_full(sim)
+        , loop::cells_interior(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
@@ -51,7 +51,7 @@ void prims_to_cons_domain(aether::core::Simulation &sim){
 
     Kokkos::parallel_for(
         "Prims_to_cons_domain" 
-        , loop::cells_full(sim)
+        , loop::cells_interior(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j

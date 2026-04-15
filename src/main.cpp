@@ -1,3 +1,4 @@
+#include "aether/core/enums.hpp"
 #include <Kokkos_Core.hpp>
 #include <aether/core/Initialize.hpp>
 #include <aether/core/RunParams_io.hpp>
@@ -21,25 +22,22 @@ int main() {
         sim = Simulation(cfg);
 
         initialize_domain(sim);
+        auto domain = sim.view();        
 
-        auto domain = sim.view();
-        boundary_conditions(sim, domain.prim);
-
+        // This is really inefficient and bad. Learn to live with it, DMR is a hell of a drug
+        boundary_conditions(sim,domain.prim);
         aether::phys::prims_to_cons_domain(sim);
-        if( sim.cfg.solve == solver::fog){
-            std::cout << "FOG \n";
-        };
+        boundary_conditions(sim,domain.cons);        
 
-        // do {
+        do {
             aether::phys::set_dt(sim);
             std::cout << "The time step is " << sim.time.dt
                       << " The current time is " << sim.time.t << "\n";
 
             Time_stepper(sim);
-        //     aether::phys::cons_to_prims_domain(sim);
-        //     boundary_conditions(sim, domain.prim);
-        //     aether::phys::prims_to_cons_domain(sim);
-        // } while (sim.time.t < sim.time.t_end ); 
+            boundary_conditions(sim, domain.cons);
+            aether::phys::cons_to_prims_domain(sim);
+        } while (sim.time.t < sim.time.t_end ); 
     
         std::cout << "The final time is " << sim.time.t << "\n";
     

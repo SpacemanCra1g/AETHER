@@ -47,28 +47,28 @@ static AETHER_INLINE void load_dmr(Sim &sim){
     auto& g = sim.grid;
     auto prim = domain.prim;
     constexpr double PI = 3.14159265358979323846;
-    double alpha = PI/3.0;
-    const double start_x = g.x_min + g.dx*0.5;
-    const double start_y = g.y_min + g.dy*0.5;
-    const int ng = g.ng;
-    const double dx = g.dx;
-    const double dy = g.dy;
-    const double inv6 = 1.0/6.0;
-    const double inv_tan_alpha = 1.0 / std::tan(alpha);
-    const double post_shock_u = 8.25*std::sin(alpha);
-    const double post_shock_v = -8.25*std::cos(alpha);
+    constexpr double inv6 = 1.0/6.0;
+    const double inv_sqr3 = 1.0/std::sqrt(3.0);
+    const double post_shock_u = 8.25 * std::cos(PI/6.0);
+    const double post_shock_v = -8.25 * std::sin(PI/6.0);
+
+    const double dx = domain.dx;
+    const double dy = domain.dy;
+    const double start_x = g.x_min + .5*dx;
+    const double start_y = g.y_min + .5*dy;
+    const int ng = domain.ng;
 
     Kokkos::parallel_for(
          "Load DMR initial conditoins"
-        , loop::cells_full(sim)
+        , loop::cells_interior(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
-            , const int j
+            , [[maybe_unused]] const int j
             , const int i)
         {
             const double x = start_x + (i-ng)*dx;
             const double y = start_y + (j-ng)*dy;
-            const bool pre_shock = (x > inv6 + y*inv_tan_alpha);
+            const bool pre_shock = (x >= inv6 + y*inv_sqr3);
             prim(P::RHO, 0, j, i) = (pre_shock) ? 1.4 : 8.0;
             prim(P::VX , 0, j, i) = (pre_shock) ? 0.0 : post_shock_u;
             prim(P::VY , 0, j, i) = (pre_shock) ? 0.0 : post_shock_v;
