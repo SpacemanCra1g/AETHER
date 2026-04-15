@@ -66,6 +66,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
 
     double inv_dx = 1.0/view.dx;
     double inv_dy = 1.0/view.dy;
+    double inv_dz = 1.0/view.dz;
     double dtx = view.dt * inv_dx;
     
 
@@ -75,6 +76,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
         loops::solver_sweep_policy(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             double dty = view.dt * inv_dy;
+            double dtz = view.dt * inv_dz;
             vec p_vec, p_vec_L, p_vec_R;
             prims p;
             chars Eigs;
@@ -124,38 +126,70 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                 for (int c = 0; c < numvar; ++c) {
                     p_vec_L[c] = prim(c,k,j-1,i);
                     p_vec_R[c] = prim(c,k,j+1,i);
-            }
+                }
 
-            if constexpr (TVD == limiter::minmod) {
-                d_w =  minmod( Eigs.y.left *(p_vec - p_vec_L), Eigs.y.left *(p_vec_R - p_vec) );
-            } else if constexpr (TVD == limiter::mc) {
-                d_w = mc( 0.5*Eigs.y.left * (p_vec_R - p_vec_L) , 2.0*Eigs.y.left * (p_vec_R - p_vec), 2.0*Eigs.y.left * (p_vec - p_vec_L)) ;
-            } else if constexpr (TVD == limiter::vanleer) {
-                d_w =  van_leer(Eigs.y.left *(p_vec - p_vec_L), Eigs.y.left *(p_vec_R - p_vec));
-            }
+                if constexpr (TVD == limiter::minmod) {
+                    d_w =  minmod( Eigs.y.left *(p_vec - p_vec_L), Eigs.y.left *(p_vec_R - p_vec) );
+                } else if constexpr (TVD == limiter::mc) {
+                    d_w = mc( 0.5*Eigs.y.left * (p_vec_R - p_vec_L) , 2.0*Eigs.y.left * (p_vec_R - p_vec), 2.0*Eigs.y.left * (p_vec - p_vec_L)) ;
+                } else if constexpr (TVD == limiter::vanleer) {
+                    d_w =  van_leer(Eigs.y.left *(p_vec - p_vec_L), Eigs.y.left *(p_vec_R - p_vec));
+                }
 
-            p_vec_L = p_vec;
-            p_vec_R = p_vec;
+                p_vec_L = p_vec;
+                p_vec_R = p_vec;
 
-            for (int c = 0; c < P::COUNT; c++){
-                double eig = Eigs.y.lambda(c);
-                if (eig >= 0.0){
-                    p_vec_R += 0.5*(1.0 - eig*dty)*d_w[c]*col(Eigs.y.right,c);
-                } else {
-                    p_vec_L += 0.5*(-1.0 - eig*dty)*d_w[c]*col(Eigs.y.right,c);
+                for (int c = 0; c < P::COUNT; c++){
+                    double eig = Eigs.y.lambda(c);
+                    if (eig >= 0.0){
+                        p_vec_R += 0.5*(1.0 - eig*dty)*d_w[c]*col(Eigs.y.right,c);
+                    } else {
+                        p_vec_L += 0.5*(-1.0 - eig*dty)*d_w[c]*col(Eigs.y.right,c);
+                    }
+                }
+
+                for (int c = 0; c < numvar; ++c) {
+                    for (int q = 0; q < view.quad; ++q) {
+                        view.fyR(c, q, k, j, i) = p_vec_L[c];
+                        view.fyL(c, q, k, j+1, i) = p_vec_R[c];
+                    }
                 }
             }
 
-            for (int c = 0; c < numvar; ++c) {
-                for (int q = 0; q < view.quad; ++q) {
-                    view.fyR(c, q, k, j, i) = p_vec_L[c];
-                    view.fyL(c, q, k, j+1, i) = p_vec_R[c];
+                        // These are the y-sweeps for PLM
+            if constexpr (dim > 2) {
+                for (int c = 0; c < numvar; ++c) {
+                    p_vec_L[c] = prim(c,k-1,j,i);
+                    p_vec_R[c] = prim(c,k+1,j,i);
+                }
+
+                if constexpr (TVD == limiter::minmod) {
+                    d_w =  minmod( Eigs.z.left *(p_vec - p_vec_L), Eigs.z.left *(p_vec_R - p_vec) );
+                } else if constexpr (TVD == limiter::mc) {
+                    d_w = mc( 0.5*Eigs.z.left * (p_vec_R - p_vec_L) , 2.0*Eigs.z.left * (p_vec_R - p_vec), 2.0*Eigs.z.left * (p_vec - p_vec_L)) ;
+                } else if constexpr (TVD == limiter::vanleer) {
+                    d_w =  van_leer(Eigs.z.left *(p_vec - p_vec_L), Eigs.z.left *(p_vec_R - p_vec));
+                }
+
+                p_vec_L = p_vec;
+                p_vec_R = p_vec;
+
+                for (int c = 0; c < P::COUNT; c++){
+                    double eig = Eigs.z.lambda(c);
+                    if (eig >= 0.0){
+                        p_vec_R += 0.5*(1.0 - eig*dtz)*d_w[c]*col(Eigs.z.right,c);
+                    } else {
+                        p_vec_L += 0.5*(-1.0 - eig*dtz)*d_w[c]*col(Eigs.z.right,c);
+                    }
+                }
+
+                for (int c = 0; c < numvar; ++c) {
+                    for (int q = 0; q < view.quad; ++q) {
+                        view.fzR(c, q, k, j, i) = p_vec_L[c];
+                        view.fzL(c, q, k+1, j, i) = p_vec_R[c];
+                    }
                 }
             }
-
-            
-            }
-
         }   
     );
 }
@@ -175,7 +209,10 @@ void Space_solve(Simulation& Sim) {
             break;
         
         case solver::plm:
-            PLM_sweep<limiter::vanleer, AETHER_DIM>(Sim);
+            if (Sim.cfg.slope_limiter == limiter::minmod){ PLM_sweep<limiter::minmod, AETHER_DIM>(Sim);}
+            else if (Sim.cfg.slope_limiter == limiter::mc){ PLM_sweep<limiter::mc, AETHER_DIM>(Sim);}
+            else if (Sim.cfg.slope_limiter == limiter::vanleer){ PLM_sweep<limiter::vanleer, AETHER_DIM>(Sim);}
+            else throw std::runtime_error("Slope limiter type not available in PLM");
             break;
         default:
             throw std::runtime_error("Space_solve: unknown space solver");

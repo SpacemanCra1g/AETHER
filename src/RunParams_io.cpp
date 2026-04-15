@@ -175,6 +175,27 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
       return false;
     }
   }
+
+  else if (s.substr(0,13) == "slope_limiter"){
+    std::string slope_limiter = s.substr(13, s.length() - 13); 
+    std::string slope_limiter_lower;
+    for (std::size_t i = 0; i < slope_limiter.length(); ++i){
+       slope_limiter_lower += std::tolower(slope_limiter[i]);
+    }
+    if (slope_limiter_lower == "mc"){
+       cfg.slope_limiter = aether::core::limiter::mc; return true;
+    }
+    else if (slope_limiter_lower == "minmod"){
+       cfg.slope_limiter = aether::core::limiter::minmod; return true;
+    }
+    else if (slope_limiter_lower == "vanleer"){
+       cfg.slope_limiter = aether::core::limiter::vanleer; return true;
+    }
+    else {
+      throw std::runtime_error("Unknown slope_limiter selection " + slope_limiter_lower);
+      return false;
+    }
+  }
   else if (s.substr(0,21) == "num_quadrature_points"){
     cfg.num_quad = std::stoi(s.substr(21,s.length()-21)); 
     return true;
