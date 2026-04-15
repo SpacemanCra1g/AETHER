@@ -1,3 +1,4 @@
+#include "aether/core/config.hpp"
 #include "aether/core/enums.hpp"
 #include <aether/core/RunParams.hpp>
 #include <aether/core/config_build.hpp>
@@ -6,6 +7,7 @@
 
 #include <cassert>
 #include <fstream>
+#include <stdexcept>
 
 [[maybe_unused]] static bool print_if_false (std::ifstream &assertion, std::string Message){
   if (!assertion) {std::cout << Message << std::endl; return false;}
@@ -209,6 +211,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
   else if (s.substr(0,17) == "use_test_defaults"){
     std::string use_defaults = s.substr(17, s.length() - 17); 
     std::string use_defaults_lower;
+    for (std::size_t i = 0; i < use_defaults.length(); ++i){
+      use_defaults_lower += std::tolower(use_defaults[i]);
+    }
     if (use_defaults_lower == "true") {cfg.use_defaults = true; return true;}
     else if (use_defaults_lower == "false") {cfg.use_defaults = false; return true;}
     return false;
@@ -331,5 +336,138 @@ void load_run_parameters(Config& cfg){
         // if (success) std::cout << "Output Specifications loaded!\n";
         (void)success;
     }
+}
+
+AETHER_INLINE void apply_defaults(Config& cfg){
+  switch (cfg.prob) {
+
+    case test_problem::sod:
+      cfg.x_start = 0.0;
+      cfg.x_end = 1.0;
+      cfg.t_start = 0.0;
+      cfg.t_end = 0.25;
+      cfg.bc = boundary_conditions::Outflow;
+      break;
+    case test_problem::sod_y:
+      cfg.y_start = 0.0;
+      cfg.y_end = 1.0;
+      cfg.t_start = 0.0;
+      cfg.t_end = 0.25;
+      cfg.bc = boundary_conditions::Outflow;
+      break;
+    case test_problem::sod_z:
+      cfg.z_start = 0.0;
+      cfg.z_end = 1.0;
+      cfg.t_start = 0.0;
+      cfg.t_end = 0.25;
+      cfg.bc = boundary_conditions::Outflow;
+      break;
+    case test_problem::sedov:
+      cfg.x_start = 0.0;
+      cfg.x_end = 1.0;
+      cfg.y_start = 0.0;
+      cfg.y_end = 1.0;
+      cfg.z_start = 0.0;
+      cfg.z_end = 1.0;
+      cfg.t_start = 0.0;
+      cfg.t_end = 0.05;
+      cfg.bc = boundary_conditions::Outflow;
+      break;
+    case test_problem::dmr:
+      cfg.x_start = 0.0;
+      cfg.x_end   = 4.0;
+      cfg.y_start = 0.0;
+      cfg.y_end   = 1.0;
+      cfg.t_start = 0.0;
+      cfg.t_end   = 0.2;
+      cfg.bc = boundary_conditions::DoubleMachReflection;
+      break;
+    default: 
+      throw std::runtime_error("No default parameters defined for the test problem");
+      break;
+  }
+};
+  
+
+void check_run_parameters(Config& cfg) {
+    // --------------------------------------------------
+    // Apply defaults
+    // --------------------------------------------------
+    if (cfg.use_defaults) {apply_defaults(cfg);}
+
+    // --------------------------------------------------
+    // Validate entries
+    // --------------------------------------------------
+
+    // grid counts
+    if (cfg.x_count <= 0) {
+        throw std::runtime_error("Config error: x_count must be > 0.");
+    }
+    if constexpr (AETHER_DIM > 1) {
+      if (cfg.y_count <= 0) {
+        throw std::runtime_error("Config error: y_count must be > 0.");
+      }
+    }
+    if constexpr (AETHER_DIM > 2) {
+      if (cfg.z_count <= 0) {
+          throw std::runtime_error("Config error: z_count must be > 0.");
+      }
+  }
+
+    // time
+    if (!(cfg.cfl > 0.0)) {
+        throw std::runtime_error("Config error: cfl must be > 0.");
+    }
+    if (!(cfg.t_end > cfg.t_start)) {
+        throw std::runtime_error("Config error: t_end must be greater than t_start.");
+    }
+
+    // domain bounds
+    if (!(cfg.x_end > cfg.x_start)) {
+        throw std::runtime_error("Config error: x_end must be greater than x_start.");
+    }
+    if (AETHER_DIM > 1 && !(cfg.y_end > cfg.y_start)) {
+        throw std::runtime_error("Config error: y_end must be greater than y_start when y_count > 1.");
+    }
+    if (AETHER_DIM > 2 && !(cfg.z_end > cfg.z_start)) {
+        throw std::runtime_error("Config error: z_end must be greater than z_start when z_count > 1.");
+    }
+
+    // physics
+    if (!(cfg.gamma > 1.0)) {
+        throw std::runtime_error("Config error: gamma must be > 1.");
+    }
+
+
+    // quadrature
+    if (cfg.num_quad <= 0) {
+        throw std::runtime_error("Config error: num_quad must be > 0.");
+    }
+
+    // ghost cells
+    if (cfg.num_ghost <= 0) {
+        throw std::runtime_error("Config error: num_ghost must be > 0.");
+    }
+
+    if (cfg.solve == solver::fog) {
+        if (cfg.num_ghost < 1) {
+            throw std::runtime_error("Config error: solver::fog requires num_ghost >= 1.");
+        }
+        if (AETHER_DIM > 1){
+          if (cfg.num_ghost < 2) {
+            throw std::runtime_error("Config error: solver::fog requires at least 3 ghost cells for 2D CTU");
+          }
+        }
+    } else if (cfg.solve == solver::plm) {
+        if (cfg.num_ghost < 2) {
+            throw std::runtime_error("Config error: solver::plm requires num_ghost >= 2.");
+        }
+        if (AETHER_DIM > 1){
+          if (cfg.num_ghost < 3) {
+            throw std::runtime_error("Config error: solver::plm requires at least 3 ghost cells for 2D CTU");
+          }
+        }
+    }
+
 }
 };

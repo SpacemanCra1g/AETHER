@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aether/core/Kokkos_loopBounds.hpp"
 #include <Kokkos_Core.hpp>
 
 #include <aether/core/config.hpp>
@@ -109,7 +110,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
     Kokkos::parallel_for(
         "Riemann_sweep",
-        aether::loops::face_halo2<dir>(sim),
+        aether::loops::riemann_sweep_policy(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             const double gamma = gamma_P;
             for (int q = 0; q < quad; ++q) {

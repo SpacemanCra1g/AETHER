@@ -3,6 +3,7 @@
 #include <Kokkos_Core.hpp>
 #include <aether/core/simulation.hpp>
 #include <aether/core/enums.hpp>
+#include <stdexcept>
 
 using sweep_dir = aether::core::sweep_dir;
 namespace aether::loops {
@@ -10,6 +11,74 @@ namespace aether::loops {
 template<class Sim>
 using exec_space_t = typename Sim::policy_type::execution_space;
 
+
+template<class Sim>
+auto riemann_sweep_policy(const Sim& sim){
+    using exec_space = exec_space_t<Sim>;
+    int i0 = sim.cells.ibegin();
+    int iN = sim.cells.iend();
+    int j0 = sim.cells.jbegin();
+    int jN = sim.cells.jend();
+    int k0 = sim.cells.kbegin();
+    int kN = sim.cells.kend();
+    int halo=0;
+
+    if (sim.cfg.solve==aether::core::solver::fog){
+        halo = sim.cells.ng - 1;
+    } else if (sim.cfg.solve==aether::core::solver::plm){
+        halo = sim.cells.ng - 2;
+    } else {
+        throw std::runtime_error("This Space solver does not have a riemann loop policy");
+    }
+    i0 -= halo;
+    iN += halo;
+    if constexpr (AETHER_DIM > 1) {
+    j0 -= halo; jN += halo;
+    }
+    if constexpr (AETHER_DIM > 2) {
+    k0 -= halo; kN += halo;
+    }
+
+    return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+        {k0, j0, i0},
+        {kN, jN, iN}
+    );
+
+}
+
+template<class Sim>
+auto solver_sweep_policy(const Sim& sim){
+    using exec_space = exec_space_t<Sim>;
+    int i0 = sim.cells.ibegin();
+    int iN = sim.cells.iend();
+    int j0 = sim.cells.jbegin();
+    int jN = sim.cells.jend();
+    int k0 = sim.cells.kbegin();
+    int kN = sim.cells.kend();
+    int halo=0;
+
+    if (sim.cfg.solve==aether::core::solver::fog){
+        halo = sim.cells.ng;
+    } else if (sim.cfg.solve==aether::core::solver::plm){
+        halo = sim.cells.ng - 1;
+    } else {
+        throw std::runtime_error("This Space solver does not have a loop policy");
+    }
+    i0 -= halo;
+    iN += halo;
+    if constexpr (AETHER_DIM > 1) {
+    j0 -= halo; jN += halo;
+    }
+    if constexpr (AETHER_DIM > 2) {
+    k0 -= halo; kN += halo;
+    }
+
+    return Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+        {k0, j0, i0},
+        {kN, jN, iN}
+    );
+
+}
 
 template<class Sim>
 auto cells_halo3(const Sim& sim) {
@@ -107,6 +176,8 @@ auto xfaces_full(const Sim& sim) {
 // Face loop bounds
 // Rank-3 always: (k,j,i)
 // ============================================================
+
+
 template<sweep_dir dir, class Sim>
 auto face_halo1(const Sim& sim) {
     using exec_space = typename Sim::policy_type::execution_space;
