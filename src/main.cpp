@@ -35,6 +35,7 @@ int main() {
             Time_stepper(sim);
             aether::phys::cons_to_prims_domain(sim);
             boundary_conditions(sim, domain.prim);
+            aether::phys::prims_to_cons_domain(sim);
         } while (sim.time.t < sim.time.t_end ); 
     
         std::cout << "The final time is " << sim.time.t << "\n";
