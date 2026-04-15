@@ -349,6 +349,171 @@ AETHER_INLINE void periodic_bc(Sim& sim, typename Sim::CellView var) {
     }
 }
 
+
+template<typename Sim>
+AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
+    using exec_space = typename Sim::policy_type::execution_space;
+    using P = aether::prim::Prim;
+
+    constexpr int numvar = aether::phys_ct::numvar;
+
+    const int ib = sim.cells.ibegin();
+    const int ie = sim.cells.iend();
+    const int jb = sim.cells.jbegin();
+    const int je = sim.cells.jend();
+
+    const double dx   = sim.grid.dx;
+    const double dy   = sim.grid.dy;
+    const double xbeg = sim.grid.x_min;
+    const double ybeg = sim.grid.y_min;
+    const double t    = sim.time.t;
+
+    const double x0  = 1.0 / 6.0;
+    const double rt3 = std::sqrt(3.0);
+
+    // Standard Woodward-Colella DMR primitive states for gamma = 1.4
+    const double rho_pre  = 1.4;
+    const double vx_pre   = 0.0;
+    const double vy_pre   = 0.0;
+    const double p_pre    = 1.0;
+
+    const double rho_post = 8.0;
+    const double vx_post  = 8.25 * std::sin(M_PI / 3.0);
+    const double vy_post  = -8.25 * std::cos(M_PI / 3.0);
+    const double p_post   = 116.5;
+
+    // Bottom-wall shock foot
+    const double xshock_bottom = x0 + (20.0 * t) / rt3;
+
+    Kokkos::parallel_for(
+        "Dim=2 DoubleMachReflection BCs",
+        Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+            {0, 0}, {sim.cells.Ny, sim.cells.Nx}
+        ),
+        KOKKOS_LAMBDA(const int j, const int i) {
+            const double x = xbeg + (static_cast<double>(i - ib) + 0.5) * dx;
+            const double y = ybeg + (static_cast<double>(j - jb) + 0.5) * dy;
+
+            // Moving oblique shock line:
+            // x_s(y,t) = x0 + (y + 20 t)/sqrt(3)
+            const double xshock_here = x0 + (y + 20.0 * t) / rt3;
+            const bool post_shock_here = (x < xshock_here);
+
+            auto set_post = [&]() {
+                var(P::RHO, 0, j, i) = rho_post;
+                var(P::VX,  0, j, i) = vx_post;
+                var(P::VY,  0, j, i) = vy_post;
+                if constexpr (P::HAS_VZ) var(P::VZ, 0, j, i) = 0.0;
+                var(P::P,   0, j, i) = p_post;
+            };
+
+            auto set_pre = [&]() {
+                var(P::RHO, 0, j, i) = rho_pre;
+                var(P::VX,  0, j, i) = vx_pre;
+                var(P::VY,  0, j, i) = vy_pre;
+                if constexpr (P::HAS_VZ) var(P::VZ, 0, j, i) = 0.0;
+                var(P::P,   0, j, i) = p_pre;
+            };
+
+            auto set_inflow_from_shock_classifier = [&]() {
+                if (post_shock_here) set_post();
+                else                 set_pre();
+            };
+
+            // -------------------------------
+            // Bottom ghost cells
+            // -------------------------------
+            if (j < jb && i >= ib && i < ie) {
+                if (x < xshock_bottom) {
+                    // post-shock inflow segment on the wall
+                    set_post();
+                } else {
+                    // reflecting wall
+                    const int jmir = 2 * jb - 1 - j;
+
+                    var(P::RHO, 0, j, i) = var(P::RHO, 0, jmir, i);
+                    var(P::VX,  0, j, i) = var(P::VX,  0, jmir, i);
+                    var(P::VY,  0, j, i) = -var(P::VY, 0, jmir, i);
+                    if constexpr (P::HAS_VZ) var(P::VZ, 0, j, i) = var(P::VZ, 0, jmir, i);
+                    var(P::P,   0, j, i) = var(P::P,   0, jmir, i);
+                }
+            }
+
+            // -------------------------------
+            // Top ghost cells: oblique-shock inflow
+            // -------------------------------
+            else if (j >= je && i >= ib && i < ie) {
+                set_inflow_from_shock_classifier();
+            }
+
+            // -------------------------------
+            // Left ghost cells: oblique-shock inflow
+            // -------------------------------
+            else if (i < ib && j >= jb && j < je) {
+                set_inflow_from_shock_classifier();
+            }
+
+            // -------------------------------
+            // Right ghost cells: outflow
+            // -------------------------------
+            else if (i >= ie && j >= jb && j < je) {
+                for (int c = 0; c < numvar; ++c) {
+                    var(c, 0, j, i) = var(c, 0, j, ie - 1);
+                }
+            }
+
+            // -------------------------------
+            // Bottom-left corner
+            // -------------------------------
+            else if (i < ib && j < jb) {
+                if (x < xshock_bottom) {
+                    set_post();
+                } else {
+                    const int imir = 2 * ib - 1 - i;
+                    const int jmir = 2 * jb - 1 - j;
+
+                    var(P::RHO, 0, j, i) = var(P::RHO, 0, jmir, imir);
+                    var(P::VX,  0, j, i) = var(P::VX,  0, jmir, imir);
+                    var(P::VY,  0, j, i) = -var(P::VY, 0, jmir, imir);
+                    if constexpr (P::HAS_VZ) var(P::VZ, 0, j, i) = var(P::VZ, 0, jmir, imir);
+                    var(P::P,   0, j, i) = var(P::P,   0, jmir, imir);
+                }
+            }
+
+            // -------------------------------
+            // Top-left corner: inflow
+            // -------------------------------
+            else if (i < ib && j >= je) {
+                set_inflow_from_shock_classifier();
+            }
+
+            // -------------------------------
+            // Top-right corner: top inflow dominates
+            // -------------------------------
+            else if (i >= ie && j >= je) {
+                set_inflow_from_shock_classifier();
+            }
+
+            // -------------------------------
+            // Bottom-right corner
+            // -------------------------------
+            else if (i >= ie && j < jb) {
+                if (x < xshock_bottom) {
+                    set_post();
+                } else {
+                    const int jmir = 2 * jb - 1 - j;
+
+                    var(P::RHO, 0, j, i) = var(P::RHO, 0, jmir, ie - 1);
+                    var(P::VX,  0, j, i) = var(P::VX,  0, jmir, ie - 1);
+                    var(P::VY,  0, j, i) = -var(P::VY, 0, jmir, ie - 1);
+                    if constexpr (P::HAS_VZ) var(P::VZ, 0, j, i) = var(P::VZ, 0, jmir, ie - 1);
+                    var(P::P,   0, j, i) = var(P::P,   0, jmir, ie - 1);
+                }
+            }
+        }
+    );
+}
+
 } // unnamed namespace
 
 
@@ -362,6 +527,10 @@ void boundary_conditions(Simulation& sim, CellView var) {
 
         case boundary_conditions::Periodic:
             periodic_bc(sim, var);
+            break;
+
+        case boundary_conditions::DoubleMachReflection:
+            DoubleMachReflection(sim, var);
             break;
 
         case boundary_conditions::Reflecting:

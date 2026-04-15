@@ -141,6 +141,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     else if (BCs_lower == "reflecting"){
        cfg.bc = aether::core::boundary_conditions::Reflecting; return true;
     }
+    else if (BCs_lower == "dmr"){
+       cfg.bc = aether::core::boundary_conditions::DoubleMachReflection; return true;
+    }
     else {
       throw std::runtime_error("Unknown Boundary Condition selection " + BCs_lower);
       return false;
@@ -418,8 +421,8 @@ void check_run_parameters(Config& cfg) {
     if (!(cfg.cfl > 0.0)) {
         throw std::runtime_error("Config error: cfl must be > 0.");
     }
-    if (!(cfg.t_end > cfg.t_start)) {
-        throw std::runtime_error("Config error: t_end must be greater than t_start.");
+    if (!(cfg.t_end >= cfg.t_start)) {
+        throw std::runtime_error("Config error: t_end must be greater than or equal to t_start.");
     }
 
     // domain bounds

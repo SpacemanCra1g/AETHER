@@ -33,8 +33,8 @@ int main() {
                       << " The current time is " << sim.time.t << "\n";
 
             Time_stepper(sim);
-            boundary_conditions(sim, domain.cons);
             aether::phys::cons_to_prims_domain(sim);
+            boundary_conditions(sim, domain.prim);
         } while (sim.time.t < sim.time.t_end ); 
     
         std::cout << "The final time is " << sim.time.t << "\n";
