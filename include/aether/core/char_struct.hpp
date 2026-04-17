@@ -1,87 +1,77 @@
-#pragma once 
+#pragma once
+
 #include "aether/core/config.hpp"
-#include <array>
-#include <vector>
 #include <aether/math/mats.hpp>
 #include <aether/physics/counts.hpp>
+#include <Kokkos_Macros.hpp>
 
 namespace aether::core {
 
+template <int N>
+using eigvals_t = aether::math::Vec<N>;
 
-template <int Dim,int numvar>
-struct eigenvec_viewT{
-    aether::math::Mat<numvar> *x_left, *x_right, *y_left, *y_right, *z_left,*z_right;
-    std::array<double,5> *x_eigs, *y_eigs, *z_eigs;
-    bool *populated;
+template <int N>
+struct spectral_dir_data {
+    aether::math::Mat<N> left {};
+    aether::math::Mat<N> right {};
+    eigvals_t<N> eigs {};
 
-};
-using eigenvec_view = eigenvec_viewT<AETHER_DIM, aether::phys_ct::numvar>;
-
-
-template <int Dim,int numvar>
-struct EigenvectorsT {
-
-std::vector<aether::math::Mat<numvar> > x_left, x_right, y_left, y_right, z_left, z_right;
-std::vector<std::array<double,5>> x_eigs, y_eigs, z_eigs;
-bool populated = false;
-
-EigenvectorsT() = default;
-
-EigenvectorsT(const int num_cells){
-
-    x_left.resize(num_cells);
-    x_right.resize(num_cells);
-    x_eigs.resize(num_cells);
-    if constexpr (Dim > 1) {
-    y_left.resize(num_cells);
-    y_right.resize(num_cells);
-    y_eigs.resize(num_cells);
-    }
-    if constexpr (Dim > 2) {
-    z_left.resize(num_cells);
-    z_right.resize(num_cells);
-    z_eigs.resize(num_cells);
-    }
-}
-
-[[nodiscard]] AETHER_INLINE eigenvec_viewT<Dim, numvar> view() noexcept{
-    eigenvec_viewT<Dim, numvar> v;
-
-    v.y_left = nullptr;
-    v.z_left = nullptr;
-    v.y_right = nullptr;
-    v.z_right = nullptr;
-    v.y_eigs = nullptr;
-    v.z_eigs = nullptr;
-
-    v.x_left = x_left.data();
-    v.x_right = x_right.data();
-    v.x_eigs = x_eigs.data();
-    v.populated = &populated;
-
-    if constexpr (Dim > 1) {
-    v.y_left = y_left.data();    
-    v.y_right = y_right.data();
-    v.y_eigs = y_eigs.data();
+    KOKKOS_INLINE_FUNCTION
+    double& lambda(const int m) noexcept {
+        return eigs[m];
     }
 
-    if constexpr (Dim > 2) {
-    v.z_left = z_left.data();
-    v.z_right = z_right.data();
-    v.z_eigs = z_eigs.data();
+    KOKKOS_INLINE_FUNCTION
+    const double& lambda(const int m) const noexcept {
+        return eigs[m];
     }
-    return v;
-}
-
 };
 
-struct one_cell_spectral_container{
-    aether::math::Mat<phys_ct::numvar>  *x_left, *x_right,
-                                        *y_left, *y_right,
-                                        *z_left, *z_right;
-    std::array<double,5> *x_eigs, *y_eigs, *z_eigs;
+template <int Dim, int NumVar>
+struct spectral_cell_t {
+    spectral_dir_data<NumVar> x {};
+    spectral_dir_data<NumVar> y {};
+    spectral_dir_data<NumVar> z {};
+
+    KOKKOS_INLINE_FUNCTION
+    spectral_dir_data<NumVar>& x_dir() noexcept {
+        return x;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    const spectral_dir_data<NumVar>& x_dir() const noexcept {
+        return x;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    spectral_dir_data<NumVar>& y_dir() noexcept {
+        static_assert(Dim > 1, "y_dir() is only valid when Dim > 1");
+        return y;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    const spectral_dir_data<NumVar>& y_dir() const noexcept {
+        static_assert(Dim > 1, "y_dir() is only valid when Dim > 1");
+        return y;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    spectral_dir_data<NumVar>& z_dir() noexcept {
+        static_assert(Dim > 2, "z_dir() is only valid when Dim > 2");
+        return z;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    const spectral_dir_data<NumVar>& z_dir() const noexcept {
+        static_assert(Dim > 2, "z_dir() is only valid when Dim > 2");
+        return z;
+    }
 };
 
-using eigenvectors = EigenvectorsT<AETHER_DIM, aether::phys_ct::numvar>;
+template <int Dim, int NumVar>
+using one_cell_spectral_containerT = spectral_cell_t<Dim, NumVar>;
 
-}
+using one_cell_spectral_container =
+    one_cell_spectral_containerT<AETHER_DIM, aether::phys_ct::numvar>;
+
+} // namespace aether::core

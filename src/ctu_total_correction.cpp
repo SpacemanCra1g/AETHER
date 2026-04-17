@@ -4,14 +4,14 @@
 #include <aether/core/RiemannDispatch.hpp>
 
 namespace aether::core{
-void CTU_correction([[maybe_unused]] Simulation &sim){
-    
-    #if AETHER_DIM > 1
+
+void CTU_correction([[maybe_unused]] Simulation& sim) {
+
+#if AETHER_DIM > 1 
     auto view = sim.view();
     Riemann_dispatch(sim, view);
     ctu_half_time_correction<AETHER_DIM>(sim, view);
-    #endif
-    
-}
+#endif
 
+}
 }

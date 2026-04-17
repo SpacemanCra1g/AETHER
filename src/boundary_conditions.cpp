@@ -1,313 +1,480 @@
-#include <stdexcept>
-#include "aether/core/config.hpp"
-#include "aether/core/simulation.hpp"
-#include "aether/core/views.hpp"
-#include "aether/physics/counts.hpp"
+#include <Kokkos_Core.hpp>
+#include <aether/core/config.hpp>
+#include <aether/core/simulation.hpp>
 #include <aether/core/boundary_conditions.hpp>
-#include <aether/core/prim_layout.hpp>
 #include <aether/core/enums.hpp>
-#include <sys/cdefs.h>
+#include <aether/physics/counts.hpp>
 
-namespace aether::core { 
+#include <stdexcept>
 
-AETHER_INLINE static void outflow_bc(CellsView &var){
-    constexpr int numvar = phys_ct::numvar;
+namespace aether::core {
 
-    if constexpr( AETHER_DIM == 1){
-        const int ng = var.ext.ng;
-        const int nx = var.ext.nx;
+namespace {
 
-        for (int c = 0; c < numvar; ++c){
-            const double left_edge  = var.var(c,0,0,0);
-            const double right_edge = var.var(c,nx-1,0,0);
-            double* AETHER_RESTRICT p_left  = var.comp[c];
-            double* AETHER_RESTRICT p_right = &var.comp[c][nx+ng];
-
-            #pragma omp simd
-            for (int i = 0; i < ng; ++i){
-                p_left[i] = left_edge;
-            }
-            #pragma omp simd
-            for (int i = 0; i < ng; ++i){
-                p_right[i] = right_edge;
-            }
-        }
-    }
-
-    else if constexpr( AETHER_DIM == 2){
-
-        const int ng = var.ext.ng;
-        const int nx = var.ext.nx;
-        const int ny = var.ext.ny;
-
-        #pragma omp parallel default(none) shared(ng,nx,ny,var,numvar)
-        {
-            // x-faces (left/right), for all interior y
-            #pragma omp for schedule(static) collapse(3) nowait
-            for (int j = 0; j < ny; ++j){
-                for (int c = 0; c < numvar; ++c){
-                    for (int i = 0; i < ng; ++i){
-                        var.var(c, i-ng, j, 0) = var.var(c, 0    , j , 0);
-                        var.var(c, nx+i, j, 0) = var.var(c, nx-1 , j , 0);
-                    }
-                }
-            }
-
-            // y-faces (bottom/top), for all interior x
-            #pragma omp for schedule(static) collapse(3) nowait
-            for (int j = 0; j < ng; ++j){
-                for (int c = 0; c < numvar; ++c){
-                    for (int i = 0; i < nx; ++i){
-                        var.var(c, i, j-ng  , 0) = var.var(c, i , 0    , 0);
-                        var.var(c, i, ny+j , 0)  = var.var(c, i , ny-1 , 0);
-                    }
-                }
-            }
-
-            // 2D corners
-            #pragma omp for schedule(static) collapse(3) nowait
-            for (int c = 0; c < numvar; ++c){
-                for (int jg = 0; jg < ng; ++jg){
-                    for (int ig = 0; ig < ng; ++ig){
-                        var.var(c, ig-ng, jg-ng, 0)   = var.var(c, 0   , 0    , 0);
-                        var.var(c, nx+ig, jg-ng, 0)   = var.var(c, nx-1, 0    , 0);
-                        var.var(c, ig-ng, ny+jg, 0)   = var.var(c, 0   , ny-1 , 0);
-                        var.var(c, nx+ig, ny+jg, 0)   = var.var(c, nx-1, ny-1 , 0);
-                    }
-                }
-            }
-        } // OpenMP parallel
-    } // End (Dim == 2)
-
-    else if constexpr( AETHER_DIM == 3){
-
-        const int ng = var.ext.ng;
-        const int nx = var.ext.nx;
-        const int ny = var.ext.ny;
-        const int nz = var.ext.nz;
-
-        #pragma omp parallel default(none) shared(ng,nx,ny,nz,var,numvar)
-        {
-            // -------------------------
-            // Faces (6)
-            // -------------------------
-
-            // x-faces: i in ghost, j,k interior
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int k = 0; k < nz; ++k){
-                for (int j = 0; j < ny; ++j){
-                    for (int c = 0; c < numvar; ++c){
-                        for (int ig = 0; ig < ng; ++ig){
-                            var.var(c, ig-ng, j, k) = var.var(c, 0    , j, k);
-                            var.var(c, nx+ig, j, k) = var.var(c, nx-1 , j, k);
-                        }
-                    }
-                }
-            }
-
-            // y-faces: j in ghost, i,k interior
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int k = 0; k < nz; ++k){
-                for (int jg = 0; jg < ng; ++jg){
-                    for (int c = 0; c < numvar; ++c){
-                        for (int i = 0; i < nx; ++i){
-                            var.var(c, i, jg-ng, k) = var.var(c, i, 0    , k);
-                            var.var(c, i, ny+jg, k) = var.var(c, i, ny-1 , k);
-                        }
-                    }
-                }
-            }
-
-            // z-faces: k in ghost, i,j interior
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int kg = 0; kg < ng; ++kg){
-                for (int j = 0; j < ny; ++j){
-                    for (int c = 0; c < numvar; ++c){
-                        for (int i = 0; i < nx; ++i){
-                            var.var(c, i, j, kg-ng) = var.var(c, i, j, 0    );
-                            var.var(c, i, j, nz+kg) = var.var(c, i, j, nz-1 );
-                        }
-                    }
-                }
-            }
-
-            // -------------------------
-            // Edges (12)
-            // Each edge has 2 ghost directions and 1 interior direction.
-            // -------------------------
-
-            // Edges parallel to x: (j ghost, k ghost), i interior
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int c = 0; c < numvar; ++c){
-                for (int kg = 0; kg < ng; ++kg){
-                    for (int jg = 0; jg < ng; ++jg){
-                        for (int i = 0; i < nx; ++i){
-                            // (y-, z-)
-                            var.var(c, i, jg-ng , kg-ng ) = var.var(c, i, 0    , 0    );
-                            // (y+, z-)
-                            var.var(c, i, ny+jg , kg-ng ) = var.var(c, i, ny-1 , 0    );
-                            // (y-, z+)
-                            var.var(c, i, jg-ng , nz+kg ) = var.var(c, i, 0    , nz-1 );
-                            // (y+, z+)
-                            var.var(c, i, ny+jg , nz+kg ) = var.var(c, i, ny-1 , nz-1 );
-                        }
-                    }
-                }
-            }
-
-            // Edges parallel to y: (i ghost, k ghost), j interior
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int c = 0; c < numvar; ++c){
-                for (int kg = 0; kg < ng; ++kg){
-                    for (int ig = 0; ig < ng; ++ig){
-                        for (int j = 0; j < ny; ++j){
-                            // (x-, z-)
-                            var.var(c, ig-ng , j, kg-ng ) = var.var(c, 0    , j, 0    );
-                            // (x+, z-)
-                            var.var(c, nx+ig , j, kg-ng ) = var.var(c, nx-1 , j, 0    );
-                            // (x-, z+)
-                            var.var(c, ig-ng , j, nz+kg ) = var.var(c, 0    , j, nz-1 );
-                            // (x+, z+)
-                            var.var(c, nx+ig , j, nz+kg ) = var.var(c, nx-1 , j, nz-1 );
-                        }
-                    }
-                }
-            }
-
-            // Edges parallel to z: (i ghost, j ghost), k interior
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int c = 0; c < numvar; ++c){
-                for (int jg = 0; jg < ng; ++jg){
-                    for (int ig = 0; ig < ng; ++ig){
-                        for (int k = 0; k < nz; ++k){
-                            // (x-, y-)
-                            var.var(c, ig-ng , jg-ng , k) = var.var(c, 0    , 0    , k);
-                            // (x+, y-)
-                            var.var(c, nx+ig , jg-ng , k) = var.var(c, nx-1 , 0    , k);
-                            // (x-, y+)
-                            var.var(c, ig-ng , ny+jg , k) = var.var(c, 0    , ny-1 , k);
-                            // (x+, y+)
-                            var.var(c, nx+ig , ny+jg , k) = var.var(c, nx-1 , ny-1 , k);
-                        }
-                    }
-                }
-            }
-
-            // -------------------------
-            // Corners (8)
-            // 3 ghost directions: (i ghost, j ghost, k ghost)
-            // -------------------------
-            #pragma omp for schedule(static) collapse(4) nowait
-            for (int c = 0; c < numvar; ++c){
-                for (int kg = 0; kg < ng; ++kg){
-                    for (int jg = 0; jg < ng; ++jg){
-                        for (int ig = 0; ig < ng; ++ig){
-                            // (x-, y-, z-)
-                            var.var(c, ig-ng , jg-ng , kg-ng ) = var.var(c, 0    , 0    , 0    );
-                            // (x+, y-, z-)
-                            var.var(c, nx+ig , jg-ng , kg-ng ) = var.var(c, nx-1 , 0    , 0    );
-                            // (x-, y+, z-)
-                            var.var(c, ig-ng , ny+jg , kg-ng ) = var.var(c, 0    , ny-1 , 0    );
-                            // (x+, y+, z-)
-                            var.var(c, nx+ig , ny+jg , kg-ng ) = var.var(c, nx-1 , ny-1 , 0    );
-
-                            // (x-, y-, z+)
-                            var.var(c, ig-ng , jg-ng , nz+kg ) = var.var(c, 0    , 0    , nz-1 );
-                            // (x+, y-, z+)
-                            var.var(c, nx+ig , jg-ng , nz+kg ) = var.var(c, nx-1 , 0    , nz-1 );
-                            // (x-, y+, z+)
-                            var.var(c, ig-ng , ny+jg , nz+kg ) = var.var(c, 0    , ny-1 , nz-1 );
-                            // (x+, y+, z+)
-                            var.var(c, nx+ig , ny+jg , nz+kg ) = var.var(c, nx-1 , ny-1 , nz-1 );
-                        }
-                    }
-                }
-            }
-        } // OpenMP parallel
-    } // End (Dim == 3)
-
-
-} 
-
-AETHER_INLINE static void periodic_bc(CellsView &var){
-    constexpr int numvar = phys_ct::numvar;
-
-    if constexpr( AETHER_DIM == 1){
-        const int ng = var.ext.ng;
-        const int nx = var.ext.nx;
-
-        for (int c = 0; c < numvar; ++c){
-            double* AETHER_RESTRICT right_edge = &var.var(c,nx-ng,0,0);
-            double* AETHER_RESTRICT left_edge = &var.var(c,0,0,0);
-
-            double* AETHER_RESTRICT p_left = var.comp[c];
-            double* AETHER_RESTRICT p_right = &var.comp[c][nx+ng];
-
-            #pragma omp simd
-            for (int i = 0; i < ng; ++i){
-                p_left[i] = *(right_edge+i);
-            }
-            #pragma omp simd
-            for (int i = 0; i < ng; ++i){
-                p_right[i] = *(left_edge+i);
-            }
-        }
-    }
-
-    else if constexpr( AETHER_DIM == 2){
-
-        const int ng = var.ext.ng;
-        const int nx = var.ext.nx;
-        const int ny = var.ext.ny;
-
-        #pragma omp parallel default(none) shared(ng,nx,ny,var,numvar)
-        {   
-            #pragma omp for collapse(3) schedule(static) nowait
-            for (int c = 0; c < numvar; ++c){
-                for (int j = 0; j < ny; ++j){
-                    for (int i = 0; i < ng; ++i){
-                        var.var(c, i-ng, j, 0) = var.var(c, nx-ng+i, j ,0);
-                        var.var(c, nx+i, j, 0) = var.var(c, i , j ,0);
-                    }
-                }
-            } // These boundary conditions are making my head hurt 
-
-        
-            #pragma omp for collapse(3) schedule(static) nowait        
-            for (int c = 0; c < numvar; ++c){
-                for (int j = 0; j < ng; ++j){
-                    for (int i = 0; i < nx; ++i){
-                        // Bottom Ghosts            Top interior cells
-                        var.var(c, i, j-ng , 0) = var.var(c, i ,ny - ng + j,0);
-                        // Top Ghosts               Bottom interior cells
-                        var.var(c, i, ny+j, 0) = var.var(c, i ,j ,0);
-                    }
-                }
-            }
-
-            #pragma omp for collapse(3) schedule(static) nowait        
-            for (int c = 0; c < numvar; ++c){
-                for (int jg = 0; jg < ng; ++jg){
-                    for (int ig = 0; ig < ng; ++ig){
-                        // Bottom left Ghotop_left =sts    Top right interior
-                        var.var(c,ig-ng,jg-ng,0) = var.var(c, nx-ng+ig, ny-ng+jg, 0);
-                        var.var(c, nx+ig, jg-ng, 0) = var.var(c, ig, ny-ng+jg, 0);                        
-                        var.var(c,ig-ng,ny+jg,0) = var.var(c,nx-ng + ig, jg, 0);
-                        var.var(c,nx+ig,ny+jg,0) = var.var(c,ig,jg,0);
-                    }
-                }
-            } // c loop for
-        } // openMP parallel end
-    } // End 2D case
+[[maybe_unused]] KOKKOS_INLINE_FUNCTION
+int clamp_index(const int idx, const int begin, const int end_exclusive) {
+    return (idx < begin) ? begin : ((idx >= end_exclusive) ? (end_exclusive - 1) : idx);
 }
- 
-// Dispatch function to call the boundary condition method
-void boundary_conditions(Simulation& Sim,CellsView& var){
-    switch (Sim.cfg.bc) {
-        case boundary_conditions::Outflow : outflow_bc(var); break;
-        case boundary_conditions::Periodic : periodic_bc(var); break;
-        case boundary_conditions::Reflecting : break;
-        default: throw std::runtime_error("Invalid Boundary Condition reached"); break;
-    };
-} //boundary_conditions
-} // Namespace
+
+KOKKOS_INLINE_FUNCTION
+int wrap_index(const int idx, const int begin, const int end_exclusive) {
+    const int n = end_exclusive - begin;
+    int x = idx - begin;
+    x %= n;
+    if (x < 0) x += n;
+    return begin + x;
+}
+
+// ============================================================
+// Outflow BC
+// ============================================================
+
+template<typename Sim>
+AETHER_INLINE void outflow_bc(Sim& sim, typename Sim::CellView var) {
+    constexpr int numvar = phys_ct::numvar;
+    using exec_space = typename Sim::policy_type::execution_space;
+
+    const int ib = sim.cells.ibegin();
+    const int ie = sim.cells.iend();
+    const int ng = sim.grid.ng;
+
+    if constexpr (Sim::dim == 1) {
+        Kokkos::parallel_for(
+            "bc_outflow_1d_xleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+                {0, 0}, {numvar, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g) {
+                var(c, 0, 0, g) = var(c, 0, 0, ib);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_outflow_1d_xright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+                {0, 0}, {numvar, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g) {
+                var(c, 0, 0, ie + g) = var(c, 0, 0, ie - 1);
+            }
+        );
+    }
+
+    else if constexpr (Sim::dim == 2) {
+        const int jb = sim.cells.jbegin();
+        const int je = sim.cells.jend();
+
+        // X ghost slabs: all j, ghost i
+        Kokkos::parallel_for(
+            "Dim=2 Outflow BCs",
+            Kokkos::MDRangePolicy<exec_space,Kokkos::Rank<2>>(
+                {0,0},{sim.cells.Ny,sim.cells.Nx}
+            ),
+            KOKKOS_LAMBDA(const int j, const int i){
+                if (j < jb && i >= ib && i < ie) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,jb,i);
+                } else if (j >= je && i >= ib && i < ie) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,je-1,i);
+                } // This concludes the j sweep. Now for the i's                
+                else if (i < ib && j >= jb && j < je) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,j,ib);
+                } else if (i >= ie && j >= jb && j < je) {
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,j,ie-1);
+                }
+                // Now we sweep the corners 
+                else if (i < ib && j < jb){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,jb,ib);
+                } else if (i < ib && j >= je){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,je-1,ib);
+                } else if (i >= ie && j >= je){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,je-1,ie-1);
+                } else if (i >= ie && j < jb){
+                    for (int c = 0; c < numvar; ++c) var(c,0,j,i) = var(c,0,jb,ie-1);
+                }
+
+            }
+        );
+    }
+
+    else if constexpr (Sim::dim == 3) {
+        const int jb = sim.cells.jbegin();
+        const int je = sim.cells.jend();
+        const int kb = sim.cells.kbegin();
+        const int ke = sim.cells.kend();
+
+        // X ghost slabs: all j,k ; ghost i
+        Kokkos::parallel_for(
+            "bc_outflow_3d_xleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, 0}, {numvar, sim.cells.Nz, sim.cells.Ny, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int j, const int g) {
+                const int sk = clamp_index(k, kb, ke);
+                const int sj = clamp_index(j, jb, je);
+                var(c, k, j, g) = var(c, sk, sj, ib);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_outflow_3d_xright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, 0}, {numvar, sim.cells.Nz, sim.cells.Ny, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int j, const int g) {
+                const int sk = clamp_index(k, kb, ke);
+                const int sj = clamp_index(j, jb, je);
+                var(c, k, j, ie + g) = var(c, sk, sj, ie - 1);
+            }
+        );
+
+        // Y ghost slabs: all k, interior i ; ghost j
+        Kokkos::parallel_for(
+            "bc_outflow_3d_yleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, ib}, {numvar, sim.cells.Nz, ng, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int g, const int i) {
+                const int sk = clamp_index(k, kb, ke);
+                var(c, k, g, i) = var(c, sk, jb, i);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_outflow_3d_yright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, ib}, {numvar, sim.cells.Nz, ng, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int g, const int i) {
+                const int sk = clamp_index(k, kb, ke);
+                var(c, k, je + g, i) = var(c, sk, je - 1, i);
+            }
+        );
+
+        // Z ghost slabs: interior i,j ; ghost k
+        Kokkos::parallel_for(
+            "bc_outflow_3d_zleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, jb, ib}, {numvar, ng, je, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g, const int j, const int i) {
+                var(c, g, j, i) = var(c, kb, j, i);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_outflow_3d_zright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, jb, ib}, {numvar, ng, je, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g, const int j, const int i) {
+                var(c, ke + g, j, i) = var(c, ke - 1, j, i);
+            }
+        );
+    }
+}
+
+// ============================================================
+// Periodic BC
+// ============================================================
+
+template<typename Sim>
+AETHER_INLINE void periodic_bc(Sim& sim, typename Sim::CellView var) {
+    constexpr int numvar = phys_ct::numvar;
+    using exec_space = typename Sim::policy_type::execution_space;
+
+    const int ib = sim.cells.ibegin();
+    const int ie = sim.cells.iend();
+    const int ng = sim.grid.ng;
+
+    if constexpr (Sim::dim == 1) {
+        Kokkos::parallel_for(
+            "bc_periodic_1d_xleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+                {0, 0}, {numvar, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g) {
+                var(c, 0, 0, g) = var(c, 0, 0, wrap_index(g, ib, ie));
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_periodic_1d_xright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+                {0, 0}, {numvar, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g) {
+                var(c, 0, 0, ie + g) = var(c, 0, 0, wrap_index(ie + g, ib, ie));
+            }
+        );
+    }
+
+    else if constexpr (Sim::dim == 2) {
+        const int jb = sim.cells.jbegin();
+        const int je = sim.cells.jend();
+
+        // X ghost slabs: all j, ghost i
+        Kokkos::parallel_for(
+            "bc_periodic_2d_xleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+                {0, 0, 0}, {numvar, sim.cells.Ny, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int j, const int g) {
+                const int sj = wrap_index(j, jb, je);
+                const int si = wrap_index(g, ib, ie);
+                var(c, 0, j, g) = var(c, 0, sj, si);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_periodic_2d_xright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+                {0, 0, 0}, {numvar, sim.cells.Ny, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int j, const int g) {
+                const int sj = wrap_index(j, jb, je);
+                const int ii = ie + g;
+                const int si = wrap_index(ii, ib, ie);
+                var(c, 0, j, ii) = var(c, 0, sj, si);
+            }
+        );
+
+        // Y ghost slabs: interior i only, ghost j
+        Kokkos::parallel_for(
+            "bc_periodic_2d_yleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+                {0, 0, ib}, {numvar, ng, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g, const int i) {
+                const int sj = wrap_index(g, jb, je);
+                var(c, 0, g, i) = var(c, 0, sj, i);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_periodic_2d_yright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<3>>(
+                {0, 0, ib}, {numvar, ng, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g, const int i) {
+                const int jj = je + g;
+                const int sj = wrap_index(jj, jb, je);
+                var(c, 0, jj, i) = var(c, 0, sj, i);
+            }
+        );
+    }
+
+    else if constexpr (Sim::dim == 3) {
+        const int jb = sim.cells.jbegin();
+        const int je = sim.cells.jend();
+        const int kb = sim.cells.kbegin();
+        const int ke = sim.cells.kend();
+
+        // X ghost slabs: all j,k ; ghost i
+        Kokkos::parallel_for(
+            "bc_periodic_3d_xleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, 0}, {numvar, sim.cells.Nz, sim.cells.Ny, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int j, const int g) {
+                const int sk = wrap_index(k, kb, ke);
+                const int sj = wrap_index(j, jb, je);
+                const int si = wrap_index(g, ib, ie);
+                var(c, k, j, g) = var(c, sk, sj, si);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_periodic_3d_xright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, 0}, {numvar, sim.cells.Nz, sim.cells.Ny, ng}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int j, const int g) {
+                const int sk = wrap_index(k, kb, ke);
+                const int sj = wrap_index(j, jb, je);
+                const int ii = ie + g;
+                const int si = wrap_index(ii, ib, ie);
+                var(c, k, j, ii) = var(c, sk, sj, si);
+            }
+        );
+
+        // Y ghost slabs: all k, interior i ; ghost j
+        Kokkos::parallel_for(
+            "bc_periodic_3d_yleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, ib}, {numvar, sim.cells.Nz, ng, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int g, const int i) {
+                const int sk = wrap_index(k, kb, ke);
+                const int sj = wrap_index(g, jb, je);
+                var(c, k, g, i) = var(c, sk, sj, i);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_periodic_3d_yright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, 0, ib}, {numvar, sim.cells.Nz, ng, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int k, const int g, const int i) {
+                const int sk = wrap_index(k, kb, ke);
+                const int jj = je + g;
+                const int sj = wrap_index(jj, jb, je);
+                var(c, k, jj, i) = var(c, sk, sj, i);
+            }
+        );
+
+        // Z ghost slabs: interior i,j ; ghost k
+        Kokkos::parallel_for(
+            "bc_periodic_3d_zleft",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, jb, ib}, {numvar, ng, je, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g, const int j, const int i) {
+                const int sk = wrap_index(g, kb, ke);
+                var(c, g, j, i) = var(c, sk, j, i);
+            }
+        );
+
+        Kokkos::parallel_for(
+            "bc_periodic_3d_zright",
+            Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
+                {0, 0, jb, ib}, {numvar, ng, je, ie}
+            ),
+            KOKKOS_LAMBDA(const int c, const int g, const int j, const int i) {
+                const int kk = ke + g;
+                const int sk = wrap_index(kk, kb, ke);
+                var(c, kk, j, i) = var(c, sk, j, i);
+            }
+        );
+    }
+}
+
+template<typename Sim>
+AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
+    using exec_space = typename Sim::policy_type::execution_space;
+    using P = aether::prim::Prim;
+
+    double Gamma = sim.grid.gamma;
+    const int ib = sim.cells.ibegin();
+    const int ie = sim.cells.iend();
+    const int jb = sim.cells.jbegin();
+    const int je = sim.cells.jend();
+
+    const double dx   = sim.grid.dx;
+    const double xbeg = sim.grid.x_min + 0.5*dx;
+    const double t    = sim.time.t;
+    const int ng = sim.grid.ng;
+
+    const double x0  = 1.0 / 6.0;
+    const double alpha = M_PI/3.0;
+    const double inv_sin_alpha = 1.0/std::sin(alpha);
+    const double inv_tan_alpha = 1.0/std::tan(alpha);
+
+    // Standard Woodward-Colella DMR primitive states for gamma = 1.4
+    const double rho_pre  = 1.4;
+    const double vx_pre   = 0.0;
+    const double vy_pre   = 0.0;
+    const double p_pre    = 1.0;
+    double v2 = vx_pre*vx_pre + vy_pre*vy_pre;
+
+    const double mx_pre = vx_pre*rho_pre;
+    const double my_pre = vy_pre*rho_pre;
+    const double E_pre = p_pre / (Gamma-1.0) + 0.5*rho_pre*v2;
+
+    const double rho_post = 8.0;
+    const double vx_post  = 8.25 * std::sin(alpha);
+    const double vy_post  = -8.25 * std::cos(alpha); 
+    const double p_post   = 116.5;
+
+    v2 = vx_post*vx_post + vy_post*vy_post;
+    const double mx_post  = vx_post*rho_post;
+    const double my_post  = vy_post*rho_post;
+    const double E_post   = p_post / (Gamma-1.0) + 0.5*rho_post*v2;
+
+    Kokkos::parallel_for(
+        "Dim=2 DoubleMachReflection BCs",
+        Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<2>>(
+            {0, 0}, {sim.cells.Ny, sim.cells.Nx}
+        ),
+        KOKKOS_LAMBDA(const int j, const int i) {
+            double x = xbeg + (i - ng)*dx;
+
+            // Left boundary (post shock)
+            if (i < ib ){
+                var(P::RHO,0,j,i) = rho_post;
+                var(P::VX,0,j,i) = mx_post;
+                var(P::VY,0,j,i) = my_post;
+                var(P::P,0,j,i) = E_post;
+            }
+
+            // Bottom boundary (post shock & recflecting)
+            else if (j < jb && i >= ib && i < ie){
+                if (x <= x0){
+                    var(P::RHO,0,j,i) = rho_post;
+                    var(P::VX,0,j,i) = mx_post;
+                    var(P::VY,0,j,i) = my_post;
+                    var(P::P,0,j,i) = E_post;
+                } else{
+                    var(P::RHO,0,j,i) = var(P::RHO, 0, 2*ng - j -1, i);
+                    var(P::VX,0,j,i)  = var(P::VX,  0, 2*ng - j -1, i);
+                    var(P::VY,0,j,i)  = - var(P::VY,  0, 2*ng - j -1, i);
+                    var(P::P,0,j,i)   = var(P::P,   0, 2*ng - j -1, i);
+                }
+            }
+
+            // Top boundary (Time dependent moving boundary)
+            else if (j >= je && i >= ib && i < ie){
+                double xs = 10.0*t*inv_sin_alpha + x0 + inv_tan_alpha;
+                if (x < xs){
+                    var(P::RHO,0,j,i) = rho_post;
+                    var(P::VX,0,j,i) = mx_post;
+                    var(P::VY,0,j,i) = my_post;
+                    var(P::P,0,j,i) = E_post;
+                } else{
+                    var(P::RHO,0,j,i) = rho_pre;
+                    var(P::VX,0,j,i) = mx_pre;
+                    var(P::VY,0,j,i) = my_pre;
+                    var(P::P,0,j,i) = E_pre;
+                }
+            }
+
+            // Right boundary (pre-shock state)
+            else if (i >= ie){
+                var(P::RHO,0,j,i) = rho_pre;
+                var(P::VX,0,j,i) = mx_pre;
+                var(P::VY,0,j,i) = my_pre;
+                var(P::P,0,j,i) = E_pre;
+            }
+        }
+    );
+}
+
+} // unnamed namespace
+
+
+#include <aether/core/boundary_conditions.hpp> 
+
+void boundary_conditions(Simulation& sim, CellView var) {
+    switch (sim.cfg.bc) {
+        case boundary_conditions::Outflow:
+            outflow_bc(sim, var);
+            break;
+
+        case boundary_conditions::Periodic:
+            periodic_bc(sim, var);
+            break;
+
+        case boundary_conditions::DoubleMachReflection:
+            DoubleMachReflection(sim, var);
+            break;
+
+        case boundary_conditions::Reflecting:
+            // TODO
+            break;
+
+        default:
+            throw std::runtime_error("Invalid boundary condition reached");
+    }
+}
+
+} // namespace aether::core

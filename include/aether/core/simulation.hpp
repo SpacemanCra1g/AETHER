@@ -1,580 +1,564 @@
 #pragma once
-#include "aether/core/config.hpp"
-#include "aether/core/config_build.hpp"
-#include "aether/core/views.hpp"               // Quadrature SoA, flux and cell views
-#include <aether/core/RunParams.hpp>           // config struct
-#include <aether/core/strides.hpp>             // Extents struct
-#include <aether/physics/counts.hpp>           // number of variables
-#include <aether/core/char_struct.hpp>
+#include <array>
+#include <aether/core/config.hpp>
+#include <aether/core/config_build.hpp>
+#include <aether/core/Kokkos_Policy.hpp>
+#include <aether/core/RunParams.hpp>
+#include <aether/core/strides.hpp>
 #include <aether/core/enums.hpp>
+#include <aether/physics/counts.hpp>
 
+namespace aether::core {
 
-namespace aether::core{
+template<int DIM>
+struct SimulationD;
 
-    // Simulation struct, templated on the number of Dims
-    template <int DIM> struct SimulationD;
+// ============================================================
+// Shared runtime metadata
+// ============================================================
 
-    // 1 Dimensional template for Simulation struct
-    template <> 
-    struct SimulationD<1>{
-        // ---------- Set template names to be compile time standard ----------
-
-
-        // ---------- Sub-structs, containing Time, Grid config, -----------------
-        // ---------- and a snapshot only 'view' object, passed by value ----------
-        
-        struct Time{
-            double dt{0.0}, t_start{0.0}, t_end{0.0};
-            double t{0.0}, cfl{0.0};
-            int step{0}, RK_stage{0};
-        };
-        struct Grid{
-            double dx{0.0}, dy{0.0}, dz{0.0};
-            int nx{0}, ny{0}, nz{0};
-            double x_min{0.0}, x_max{0.0};
-            double y_min{0.0}, y_max{0.0};
-            double z_min{0.0}, z_max{0.0};
-            int quad{0}, ng{0};
-            double gamma{0.0};
-        };
-        struct View{
-            double dx, dt, cfl,t;
-            int nx, quad, ng;
-            FaceArrayView x_flux_left;
-            FaceArrayView x_flux_right;
-            FaceArrayView x_flux;
-            CellsView prim, cons;
-            CharView chars;
-            eigenvec_view eigs;
-        };
-        
-        struct CTU_view{
-            FaceArrayView x_flux_left_view;
-            FaceArrayView x_flux_right_view;
-            FaceArrayView x_flux_view;
-
-            FaceArrayView y_flux_left_view;
-            FaceArrayView y_flux_right_view;
-            FaceArrayView y_flux_view;
-
-            FaceArrayView z_flux_left_view;
-            FaceArrayView z_flux_right_view;
-            FaceArrayView z_flux_view;
-
-        };
-        struct CTU_buffer{
-            [[nodiscard]] AETHER_INLINE CTU_view view(){
-            return{};
-            }
-        };
-
-        // Compile time known numvar parameter 
-        static constexpr int numvar = aether::phys_ct::numvar;
-        
-        // Declaring sub-structs
-        Config cfg;
-        Time time;
-        Grid grid;
-        // Declaring domain containers
-        CellsSoA prims_container;
-        CellsSoA cons_container;
-        CharSoA chars_container;
-        // Flux and grid extents structs
-        Extents ext;
-        FaceGridX flux_x_ext;
-        // self-explanitory 
-        Quadrature quad;
-        // Left and Right flux points containers, 
-        // each is resized to account for quad points
-        FaceArraySoA flux_left_x_container;
-        FaceArraySoA flux_right_x_container;
-        FaceArraySoA flux_x_container;
-        eigenvectors char_eigs;
-        std::array<sweep_dir, 1> sweeps;
-        CTU_buffer ctu_buff;
-
-        SimulationD() = default;
-
-        // Constructor builds the simulation struct
-        explicit SimulationD(const Config &config)
-        : cfg(config)
-        , time(fill_time(config))
-        , grid(fill_grid(config))
-        , prims_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , cons_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , chars_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , ext(grid.nx,grid.ny,grid.nz,grid.ng)
-        , flux_x_ext(ext), quad(grid.quad)
-        , flux_left_x_container(flux_x_ext, quad)
-        , flux_right_x_container(flux_x_ext, quad)
-        , flux_x_container(flux_x_ext, quad)
-        , char_eigs(prims_container.size_flat())
-        , sweeps({sweep_dir::x})
-        , ctu_buff()
-        {}
-        
-
-        // Returns a View snapshot by value, (except for the domain pointers obv)
-        [[nodiscard]] AETHER_INLINE View view() noexcept{
-            return
-                { grid.dx, time.dt, time.cfl
-                , time.t, grid.nx, grid.quad
-                , grid.ng, flux_left_x_container.view()
-                , flux_right_x_container.view()
-                , flux_x_container.view()
-                , prims_container.view()
-                , cons_container.view()
-                , chars_container.view()
-                , char_eigs.view()
-            };
-            
-        }
-    // private constructors for the grid and time structs, kept separate to make these 
-    // stucts into simple POD types (smaller memory footprint), easy to copy
-    private: 
-        static AETHER_INLINE Grid fill_grid(const Config &config) noexcept{
-            Grid g;
-            g.dx = (config.x_end - config.x_start)/config.x_count;
-            g.dy = 0.0;
-            g.dz = 0.0;
-
-            g.z_min = 0.0; g.z_max = 0.0;
-            g.y_min = 0.0; g.y_max = 0.0;
-            g.x_min = config.x_start; g.x_max = config.x_end;
-
-            g.ny = 1;
-            g.nz = 1;
-            g.nx = config.x_count;
-            
-            g.quad = config.num_quad;
-            g.ng = config.num_ghost;
-            g.gamma = config.gamma;
-            return g;
-        }
-
-        static AETHER_INLINE Time fill_time(const Config &config) noexcept{
-            Time t;
-            t.dt = 0.0;
-            t.t_start = config.t_start;
-            t.t = config.t_start;
-            t.t_end = config.t_end;
-            t.cfl = config.cfl;
-            t.step = 0;
-            t.RK_stage = 0;
-            return t;
-        }
-
-      
-    };
-
-    // 2 Dimensional template for Simulation struct
-    template <> 
-    struct SimulationD<2>{
-        // ---------- Sub-structs, containing Time, Grid config, -----------------
-        // ---------- and a snapshot only 'view' object, passed by value ----------
-        
-        struct CTU_view{
-            FaceArrayView x_flux_left_view;
-            FaceArrayView x_flux_right_view;
-            FaceArrayView x_flux_view;
-
-            FaceArrayView y_flux_left_view;
-            FaceArrayView y_flux_right_view;
-            FaceArrayView y_flux_view;
-
-        };
-
-            struct CTU_buffer{
-            [[nodiscard]] AETHER_INLINE CTU_view view(){
-            return{};
-            }
-        };
-        
-        struct Time{
-            double dt{0.0}, t_start{0.0}, t_end{0.0};
-            double t{0.0}, cfl{0.0};
-            int step{0}, RK_stage{0};
-        };
-        struct Grid{
-            double dx{0.0}, dy{0.0}, dz{0.0};
-            int nx{0}, ny{0}, nz{0};
-            double x_min{0.0}, x_max{0.0};
-            double y_min{0.0}, y_max{0.0};
-            double z_min{0.0}, z_max{0.0};
-            int quad{0}, ng{0};
-            double gamma{0.0};
-        };
-        struct View{
-            double dx, dy, dt, cfl, t;
-            int nx, ny, quad, ng;
-            FaceArrayView x_flux_left;
-            FaceArrayView x_flux_right;
-            FaceArrayView x_flux;
-
-            FaceArrayView y_flux_left;
-            FaceArrayView y_flux_right;
-            FaceArrayView y_flux;
-
-            CellsView prim, cons;
-            CharView chars;
-            eigenvec_view eigs;
-        };
-
-        // Compile time known numvar parameter 
-        static constexpr int numvar = aether::phys_ct::numvar;
-
-        // Declaring sub-structs
-        Config cfg;
-        Time time;
-        Grid grid;
-        
-        // Declaring domain containers
-        CellsSoA prims_container;
-        CellsSoA cons_container;
-        CharSoA chars_container;
-        // Flux and grid extents structs
-        Extents ext;
-        FaceGridX flux_x_ext;
-        FaceGridY flux_y_ext;
-        // self-explanitory 
-        Quadrature quad;
-        // Left and Right flux points containers, 
-        // each is resized to account for quad points
-        FaceArraySoA flux_left_x_container;
-        FaceArraySoA flux_right_x_container;
-        FaceArraySoA flux_x_container;
-
-        FaceArraySoA flux_left_y_container;
-        FaceArraySoA flux_right_y_container;
-        FaceArraySoA flux_y_container;
-        eigenvectors char_eigs;
-        std::array<sweep_dir, 2> sweeps;
-
-        CTU_buffer ctu_buff;
-
-        SimulationD() = default;
-
-        // Constructor builds the simulation struct
-        explicit SimulationD(const Config &config)
-        : cfg(config)
-        , time(fill_time(config))
-        , grid(fill_grid(config))
-        , prims_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , cons_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , chars_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , ext(grid.nx,grid.ny,grid.nz,grid.ng)
-        , flux_x_ext(ext), flux_y_ext(ext)
-        , quad(grid.quad)
-        , flux_left_x_container(flux_x_ext, quad)
-        , flux_right_x_container(flux_x_ext, quad)
-        , flux_x_container(flux_x_ext, quad)
-        , flux_left_y_container(flux_y_ext, quad)
-        , flux_right_y_container(flux_y_ext, quad)
-        , flux_y_container(flux_y_ext, quad)
-        , char_eigs(prims_container.size_flat())
-        , sweeps({sweep_dir::x,sweep_dir::y})
-        , ctu_buff()
-        {}
-        
-
-        // Returns a View snapshot by value, (except for the domain pointers obv)
-        [[nodiscard]] AETHER_INLINE View view() noexcept{
-            return
-                { grid.dx, grid.dy, time.dt, time.cfl
-                , time.t, grid.nx, grid.ny, grid.quad
-                , grid.ng, flux_left_x_container.view()
-                , flux_right_x_container.view()
-                , flux_x_container.view()
-                , flux_left_y_container.view()
-                , flux_right_y_container.view()
-                , flux_y_container.view()
-                , prims_container.view()
-                , cons_container.view()
-                , chars_container.view()
-                , char_eigs.view()
-            };
-            
-        }
-    // private constructors for the grid and time structs, kept separate to make these 
-    // stucts into simple POD types (smaller memory footprint), easy to copy
-    private: 
-        static AETHER_INLINE Grid fill_grid(const Config &config) noexcept{
-            Grid g;
-            g.dx = (config.x_end - config.x_start)/config.x_count;
-            g.dy = (config.y_end - config.y_start)/config.y_count;
-            g.dz = 0.0;
-
-            g.z_min = 0.0; g.z_max = 0.0;
-            g.y_min = config.y_start; g.y_max = config.y_end;
-            g.x_min = config.x_start; g.x_max = config.x_end;
-
-            g.ny = config.y_count;
-            g.nz = 1;
-            g.nx = config.x_count;
-            
-            g.quad = config.num_quad;
-            g.ng = config.num_ghost;
-            g.gamma = config.gamma;
-            return g;
-        }
-
-        static AETHER_INLINE Time fill_time(const Config &config) noexcept{
-            Time t;
-            t.dt = 0.0;
-            t.t_start = config.t_start;
-            t.t = config.t_start;
-            t.t_end = config.t_end;
-            t.cfl = config.cfl;
-            t.step = 0;
-            t.RK_stage = 0;
-            return t;
-        }
-    };
-
-    // 3 Dimensional template for Simulation struct
-    template <> 
-    struct SimulationD<3>{
-        // ---------- Sub-structs, containing Time, Grid config, -----------------
-        // ---------- and a snapshot only 'view' object, passed by value ----------
-        struct Time{
-            double dt{0.0}, t_start{0.0}, t_end{0.0};
-            double t{0.0}, cfl{0.0};
-            int step{0}, RK_stage{0};
-        };
-        struct Grid{
-            double dx{0.0}, dy{0.0}, dz{0.0};
-            int nx{0}, ny{0}, nz{0};
-            double x_min{0.0}, x_max{0.0};
-            double y_min{0.0}, y_max{0.0};
-            double z_min{0.0}, z_max{0.0};
-            int quad{0}, ng{0};
-            double gamma{0.0};
-        };
-        struct View{
-            double dx, dy, dz, dt, cfl, t;
-            int nx, ny, nz, quad, ng;
-            FaceArrayView x_flux_left;
-            FaceArrayView x_flux_right;
-            FaceArrayView x_flux;
-
-            FaceArrayView y_flux_left;
-            FaceArrayView y_flux_right;
-            FaceArrayView y_flux;
-
-            FaceArrayView z_flux_left;
-            FaceArrayView z_flux_right;
-            FaceArrayView z_flux;
-
-            CellsView prim, cons;
-            CharView chars;
-            eigenvec_view eigs;
-        };
-
-        struct CTU_view{
-            FaceArrayView x_flux_left_view;
-            FaceArrayView x_flux_right_view;
-            FaceArrayView x_flux_view;
-
-            FaceArrayView y_flux_left_view;
-            FaceArrayView y_flux_right_view;
-            FaceArrayView y_flux_view;
-
-            FaceArrayView z_flux_left_view;
-            FaceArrayView z_flux_right_view;
-            FaceArrayView z_flux_view;
-
-            FaceArrayView x_left_backup;
-            FaceArrayView x_right_backup;
-            FaceArrayView y_left_backup;
-            FaceArrayView y_right_backup;
-            FaceArrayView z_left_backup;
-            FaceArrayView z_right_backup;
-        };
-
-        struct CTU_buffer{
-            FaceArraySoA x_flux_left;
-            FaceArraySoA x_flux_right;
-            FaceArraySoA x_flux;
-
-            FaceArraySoA y_flux_left;
-            FaceArraySoA y_flux_right;
-            FaceArraySoA y_flux;
-
-            FaceArraySoA z_flux_left;
-            FaceArraySoA z_flux_right;
-            FaceArraySoA z_flux;            
-
-            FaceArraySoA x_left_og;
-            FaceArraySoA x_right_og;
-
-            FaceArraySoA y_left_og;
-            FaceArraySoA y_right_og;
-
-            FaceArraySoA z_left_og;
-            FaceArraySoA z_right_og;
-
-            CTU_buffer() = default;
-
-            CTU_buffer(FaceGridX x_ext, FaceGridY y_ext, FaceGridZ z_ext, Quadrature quad)
-            : x_flux_left(x_ext,quad)
-            , x_flux_right(x_ext,quad)
-            , x_flux(x_ext,quad)
-            , y_flux_left(y_ext,quad)
-            , y_flux_right(y_ext,quad)
-            , y_flux(y_ext,quad)
-            , z_flux_left(z_ext,quad)
-            , z_flux_right(z_ext,quad)
-            , z_flux(z_ext,quad)
-            , x_left_og(x_ext,quad)
-            , x_right_og(x_ext,quad)
-            , y_left_og(y_ext,quad)
-            , y_right_og(y_ext,quad)
-            , z_left_og(z_ext,quad)
-            , z_right_og(z_ext,quad)
-            {}
-
-            [[nodiscard]] AETHER_INLINE CTU_view view(){
-                return {
-                  x_flux_left.view()
-                , x_flux_right.view()
-                , x_flux.view()
-                , y_flux_left.view()
-                , y_flux_right.view()
-                , y_flux.view()
-                , z_flux_left.view()
-                , z_flux_right.view()
-                , z_flux.view()
-                , x_left_og.view()
-                , x_right_og.view()
-                , y_left_og.view()
-                , y_right_og.view()
-                , z_left_og.view()
-                , z_right_og.view()
-                };
-
-            }
-        };
-
-        // Compile time known numvar parameter 
-        static constexpr int numvar = aether::phys_ct::numvar;
-
-        // Declaring sub-structs
-        Config cfg;
-        Time time;
-        Grid grid;
-        // Declaring domain containers
-        CellsSoA prims_container;
-        CellsSoA cons_container;
-        CharSoA chars_container;
-        // Flux and grid extents structs
-        Extents ext;
-        FaceGridX flux_x_ext;
-        FaceGridY flux_y_ext;
-        FaceGridZ flux_z_ext;
-        // self-explanitory 
-        Quadrature quad;
-        // Left and Right flux points containers, 
-        // each is resized to account for quad points
-        FaceArraySoA flux_left_x_container;
-        FaceArraySoA flux_right_x_container;
-        FaceArraySoA flux_x_container;
-
-        FaceArraySoA flux_left_y_container;
-        FaceArraySoA flux_right_y_container;
-        FaceArraySoA flux_y_container;
-
-        FaceArraySoA flux_left_z_container;
-        FaceArraySoA flux_right_z_container;
-        FaceArraySoA flux_z_container;
-        eigenvectors char_eigs;
-        std::array<sweep_dir, 3> sweeps;
-        CTU_buffer ctu_buff;
-        
-        
-        SimulationD() = default;
-
-        // Constructor builds the simulation struct
-        explicit SimulationD(const Config &config)
-        : cfg(config)
-        , time(fill_time(config))
-        , grid(fill_grid(config))
-        , prims_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , cons_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , chars_container(grid.nx,grid.ny,grid.nz,grid.ng)
-        , ext(grid.nx,grid.ny,grid.nz,grid.ng)
-        , flux_x_ext(ext), flux_y_ext(ext), flux_z_ext(ext)
-        , quad(grid.quad)
-        , flux_left_x_container(flux_x_ext, quad)
-        , flux_right_x_container(flux_x_ext, quad)
-        , flux_x_container(flux_x_ext, quad)
-        , flux_left_y_container(flux_y_ext, quad)
-        , flux_right_y_container(flux_y_ext, quad)
-        , flux_y_container(flux_y_ext, quad)
-        , flux_left_z_container(flux_z_ext, quad)
-        , flux_right_z_container(flux_z_ext, quad)
-        , flux_z_container(flux_z_ext, quad)
-        , char_eigs(prims_container.size_flat())
-        , sweeps({sweep_dir::x,sweep_dir::y,sweep_dir::z})
-        , ctu_buff(flux_x_ext, flux_y_ext, flux_z_ext, quad)
-        {}
-        
-
-        // Returns a View snapshot by value, (except for the domain pointers obv)
-        [[nodiscard]] AETHER_INLINE View view() noexcept{
-            return
-                { grid.dx, grid.dy, grid.dz, time.dt, time.cfl
-                , time.t, grid.nx, grid.ny, grid.nz, grid.quad
-                , grid.ng, flux_left_x_container.view()
-                , flux_right_x_container.view()
-                , flux_x_container.view()
-                , flux_left_y_container.view()
-                , flux_right_y_container.view()
-                , flux_y_container.view()
-                , flux_left_z_container.view()
-                , flux_right_z_container.view()
-                , flux_z_container.view()
-                , prims_container.view()
-                , cons_container.view()
-                , chars_container.view()
-                , char_eigs.view()
-            };
-            
-        }
-    // private constructors for the grid and time structs, kept separate to make these 
-    // stucts into simple POD types (smaller memory footprint), easy to copy
-    private: 
-        static AETHER_INLINE Grid fill_grid(const Config &config) noexcept{
-            Grid g;
-            g.dx = (config.x_end - config.x_start)/config.x_count;
-            g.dy = (config.y_end - config.y_start)/config.y_count;
-            g.dz = (config.z_end - config.z_start)/config.z_count;;
-
-            g.z_min = config.z_start; g.z_max = config.z_end;
-            g.y_min = config.y_start; g.y_max = config.y_end;
-            g.x_min = config.x_start; g.x_max = config.x_end;
-
-            g.ny = config.y_count;
-            g.nz = config.z_count;
-            g.nx = config.x_count;
-            
-            g.quad = config.num_quad;
-            g.ng = config.num_ghost;
-            g.gamma = config.gamma;
-            return g;
-        }
-
-        static AETHER_INLINE Time fill_time(const Config &config) noexcept{
-            Time t;
-            t.dt = 0.0;
-            t.t_start = config.t_start;
-            t.t = config.t_start;
-            t.t_end = config.t_end;
-            t.cfl = config.cfl;
-            t.step = 0;
-            t.RK_stage = 0;
-            return t;
-        }
-    };
-
-    using Simulation = SimulationD<AETHER_DIM>;
+static AETHER_INLINE bool compute_ctu_enabled(const Config& c) noexcept {
+    return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm || c.solve == solver::ppm);
 }
+
+struct TimeState {
+    double dt{0.0};
+    double t_start{0.0};
+    double t_end{0.0};
+    double t{0.0};
+    double cfl{0.0};
+    int step{0};
+    int RK_stage{0};
+};
+
+struct GridState {
+    double dx{0.0}, dy{0.0}, dz{0.0};
+
+    int nx{0}, ny{1}, nz{1};
+
+    double x_min{0.0}, x_max{0.0};
+    double y_min{0.0}, y_max{0.0};
+    double z_min{0.0}, z_max{0.0};
+
+    int quad{1};
+    int ng{0};
+
+    double gamma{0.0};
+};
+
+// ============================================================
+// 1D
+// ============================================================
+
+template<>
+struct SimulationD<1> {
+    static constexpr int dim = 1;
+    static constexpr int numvar = aether::phys_ct::numvar;
+
+    using policy_type = aether::kokkos_cfg::Policy<1, AETHER_PHYSICS_KIND>;
+
+    using CellView = typename policy_type::template CellView<double>;
+    using DirView  = typename policy_type::template DirCellView<double>;
+    using FaceView = typename policy_type::template FaceView<double>;
+
+    Config cfg{};
+    TimeState time{};
+    GridState grid{};
+
+    CellGrid<1> cells{};
+    FaceGridX xfaces{};
+
+    CellView prim{};
+    CellView cons{};
+    DirView  chars{};
+
+    FaceView fxL{};
+    FaceView fxR{};
+    FaceView fx{};
+    bool ctu_enabled{false};
+
+    std::array<sweep_dir, 1> sweeps{ sweep_dir::x };
+
+    struct View {
+        double dx, dy, dz;
+        double dt, cfl, t;
+        int nx, ny, nz;
+        int ng, quad;
+        double gamma;
+
+        CellGrid<1> cells;
+        FaceGridX   xfaces;
+
+        CellView prim;
+        CellView cons;
+        DirView  chars;
+
+        FaceView fxL;
+        FaceView fxR;
+        FaceView fx;
+    };
+
+    SimulationD() = default;
+
+    explicit SimulationD(const Config& config)
+        : cfg(config),
+          time(fill_time(config)),
+          grid(fill_grid(config)),
+          cells(grid.nx, grid.ng),
+          xfaces(cells),
+          prim("prim", numvar, cells.Nz, cells.Ny, cells.Nx),
+          cons("cons", numvar, cells.Nz, cells.Ny, cells.Nx),
+          chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
+          fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          ctu_enabled(compute_ctu_enabled(config))
+    {}
+
+    [[nodiscard]] AETHER_INLINE
+    View view() const noexcept {
+        return {
+            grid.dx, grid.dy, grid.dz,
+            time.dt, time.cfl, time.t,
+            grid.nx, grid.ny, grid.nz,
+            grid.ng, grid.quad,
+            grid.gamma,
+            cells,
+            xfaces,
+            prim,
+            cons,
+            chars,
+            fxL,
+            fxR,
+            fx
+        };
+    }
+
+private:
+    static AETHER_INLINE GridState fill_grid(const Config& c) noexcept {
+        GridState g;
+        g.dx = (c.x_end - c.x_start) / c.x_count;
+        g.dy = 0.0;
+        g.dz = 0.0;
+
+        g.nx = c.x_count;
+        g.ny = 1;
+        g.nz = 1;
+
+        g.x_min = c.x_start; g.x_max = c.x_end;
+        g.y_min = 0.0;       g.y_max = 0.0;
+        g.z_min = 0.0;       g.z_max = 0.0;
+
+        g.quad  = c.num_quad;
+        g.ng    = c.num_ghost;
+        g.gamma = c.gamma;
+        return g;
+    }
+
+    static AETHER_INLINE TimeState fill_time(const Config& c) noexcept {
+        TimeState t;
+        t.dt       = 0.0;
+        t.t_start  = c.t_start;
+        t.t_end    = c.t_end;
+        t.t        = c.t_start;
+        t.cfl      = c.cfl;
+        t.step     = 0;
+        t.RK_stage = 0;
+        return t;
+    }
+};
+
+// ============================================================
+// 2D
+// ============================================================
+
+template<>
+struct SimulationD<2> {
+    static constexpr int dim = 2;
+    static constexpr int numvar = aether::phys_ct::numvar;
+
+    using policy_type = aether::kokkos_cfg::Policy<2, AETHER_PHYSICS_KIND>;
+
+    using CellView = typename policy_type::template CellView<double>;
+    using DirView  = typename policy_type::template DirCellView<double>;
+    using FaceView = typename policy_type::template FaceView<double>;
+
+    Config cfg{};
+    TimeState time{};
+    GridState grid{};
+
+    CellGrid<2> cells{};
+    FaceGridX xfaces{};
+    FaceGridY yfaces{};
+
+    CellView prim{};
+    CellView cons{};
+    DirView  chars{};
+
+    FaceView fxL{};
+    FaceView fxR{};
+    FaceView fx{};
+
+    FaceView fyL{};
+    FaceView fyR{};
+    FaceView fy{};
+    bool ctu_enabled{false};
+
+    std::array<sweep_dir, 2> sweeps{ sweep_dir::x, sweep_dir::y };
+
+    struct View {
+        double dx, dy, dz;
+        double dt, cfl, t;
+        int nx, ny, nz;
+        int ng, quad;
+        double gamma;
+
+        CellGrid<2> cells;
+        FaceGridX   xfaces;
+        FaceGridY   yfaces;
+
+        CellView prim;
+        CellView cons;
+        DirView  chars;
+
+        FaceView fxL;
+        FaceView fxR;
+        FaceView fx;
+
+        FaceView fyL;
+        FaceView fyR;
+        FaceView fy;
+    };
+
+    SimulationD() = default;
+
+    explicit SimulationD(const Config& config)
+        : cfg(config),
+          time(fill_time(config)),
+          grid(fill_grid(config)),
+          cells(grid.nx, grid.ny, grid.ng),
+          xfaces(cells),
+          yfaces(cells),
+          prim("prim", numvar, cells.Nz, cells.Ny, cells.Nx),
+          cons("cons", numvar, cells.Nz, cells.Ny, cells.Nx),
+          chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
+          fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fyL("fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          ctu_enabled(compute_ctu_enabled(config))
+    {}
+
+    [[nodiscard]] AETHER_INLINE
+    View view() const noexcept {
+        return {
+            grid.dx, grid.dy, grid.dz,
+            time.dt, time.cfl, time.t,
+            grid.nx, grid.ny, grid.nz,
+            grid.ng, grid.quad,
+            grid.gamma,
+            cells,
+            xfaces,
+            yfaces,
+            prim,
+            cons,
+            chars,
+            fxL,
+            fxR,
+            fx,
+            fyL,
+            fyR,
+            fy
+        };
+    }
+
+private:
+    static AETHER_INLINE GridState fill_grid(const Config& c) noexcept {
+        GridState g;
+        g.dx = (c.x_end - c.x_start) / c.x_count;
+        g.dy = (c.y_end - c.y_start) / c.y_count;
+        g.dz = 0.0;
+
+        g.nx = c.x_count;
+        g.ny = c.y_count;
+        g.nz = 1;
+
+        g.x_min = c.x_start; g.x_max = c.x_end;
+        g.y_min = c.y_start; g.y_max = c.y_end;
+        g.z_min = 0.0;       g.z_max = 0.0;
+
+        g.quad  = c.num_quad;
+        g.ng    = c.num_ghost;
+        g.gamma = c.gamma;
+        return g;
+    }
+
+    static AETHER_INLINE TimeState fill_time(const Config& c) noexcept {
+        TimeState t;
+        t.dt       = 0.0;
+        t.t_start  = c.t_start;
+        t.t_end    = c.t_end;
+        t.t        = c.t_start;
+        t.cfl      = c.cfl;
+        t.step     = 0;
+        t.RK_stage = 0;
+        return t;
+    }
+};
+
+// ============================================================
+// 3D
+// ============================================================
+
+template<>
+struct SimulationD<3> {
+    static constexpr int dim = 3;
+    static constexpr int numvar = aether::phys_ct::numvar;
+
+    using policy_type = aether::kokkos_cfg::Policy<3, AETHER_PHYSICS_KIND>;
+
+    using CellView = typename policy_type::template CellView<double>;
+    using DirView  = typename policy_type::template DirCellView<double>;
+    using FaceView = typename policy_type::template FaceView<double>;
+
+    Config cfg{};
+    TimeState time{};
+    GridState grid{};
+
+    CellGrid<3> cells{};
+    FaceGridX xfaces{};
+    FaceGridY yfaces{};
+    FaceGridZ zfaces{};
+
+    CellView prim{};
+    CellView cons{};
+    DirView  chars{};
+
+    FaceView fxL{};
+    FaceView fxR{};
+    FaceView fx{};
+
+    FaceView fyL{};
+    FaceView fyR{};
+    FaceView fy{};
+
+    FaceView fzL{};
+    FaceView fzR{};
+    FaceView fz{};
+
+    bool ctu_enabled{false};
+
+    FaceView ctu_fxL{};
+    FaceView ctu_fxR{};
+    FaceView ctu_fx{};
+
+    FaceView ctu_fyL{};
+    FaceView ctu_fyR{};
+    FaceView ctu_fy{};
+
+    FaceView ctu_fzL{};
+    FaceView ctu_fzR{};
+    FaceView ctu_fz{};
+
+    FaceView ctu_xL_bak{};
+    FaceView ctu_xR_bak{};
+    FaceView ctu_yL_bak{};
+    FaceView ctu_yR_bak{};
+    FaceView ctu_zL_bak{};
+    FaceView ctu_zR_bak{};
+
+    std::array<sweep_dir, 3> sweeps{ sweep_dir::x, sweep_dir::y, sweep_dir::z };
+
+    struct View {
+        double dx, dy, dz;
+        double dt, cfl, t;
+        int nx, ny, nz;
+        int ng, quad;
+        double gamma;
+
+        CellGrid<3> cells;
+        FaceGridX   xfaces;
+        FaceGridY   yfaces;
+        FaceGridZ   zfaces;
+
+        CellView prim;
+        CellView cons;
+        DirView  chars;
+
+        FaceView fxL;
+        FaceView fxR;
+        FaceView fx;
+
+        FaceView fyL;
+        FaceView fyR;
+        FaceView fy;
+
+        FaceView fzL;
+        FaceView fzR;
+        FaceView fz;
+    };
+
+    struct CTUView {
+        bool enabled{false};
+
+        FaceView fxL;
+        FaceView fxR;
+        FaceView fx;
+
+        FaceView fyL;
+        FaceView fyR;
+        FaceView fy;
+
+        FaceView fzL;
+        FaceView fzR;
+        FaceView fz;
+
+        FaceView xL_bak;
+        FaceView xR_bak;
+        FaceView yL_bak;
+        FaceView yR_bak;
+        FaceView zL_bak;
+        FaceView zR_bak;
+    };
+
+    SimulationD() = default;
+
+    explicit SimulationD(const Config& config)
+        : cfg(config),
+          time(fill_time(config)),
+          grid(fill_grid(config)),
+          cells(grid.nx, grid.ny, grid.nz, grid.ng),
+          xfaces(cells),
+          yfaces(cells),
+          zfaces(cells),
+          prim("prim", numvar, cells.Nz, cells.Ny, cells.Nx),
+          cons("cons", numvar, cells.Nz, cells.Ny, cells.Nx),
+          chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
+          fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fyL("fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fzL("fzL", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+          fzR("fzR", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+          fz ("fz",  numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+          ctu_enabled(compute_ctu_enabled(config))
+    {
+        if (ctu_enabled) {
+            ctu_fxL = FaceView("ctu_fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_fxR = FaceView("ctu_fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_fx  = FaceView("ctu_fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+
+            ctu_fyL = FaceView("ctu_fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_fyR = FaceView("ctu_fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_fy  = FaceView("ctu_fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+
+            ctu_fzL = FaceView("ctu_fzL", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_fzR = FaceView("ctu_fzR", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_fz  = FaceView("ctu_fz",  numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+
+            ctu_xL_bak = FaceView("ctu_xL_bak", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_xR_bak = FaceView("ctu_xR_bak", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+
+            ctu_yL_bak = FaceView("ctu_yL_bak", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_yR_bak = FaceView("ctu_yR_bak", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+
+            ctu_zL_bak = FaceView("ctu_zL_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_zR_bak = FaceView("ctu_zR_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+        }
+    }
+
+    [[nodiscard]] AETHER_INLINE
+    View view() const noexcept {
+        return {
+            grid.dx, grid.dy, grid.dz,
+            time.dt, time.cfl, time.t,
+            grid.nx, grid.ny, grid.nz,
+            grid.ng, grid.quad,
+            grid.gamma,
+            cells,
+            xfaces,
+            yfaces,
+            zfaces,
+            prim,
+            cons,
+            chars,
+            fxL,
+            fxR,
+            fx,
+            fyL,
+            fyR,
+            fy,
+            fzL,
+            fzR,
+            fz
+        };
+    }
+
+    [[nodiscard]] AETHER_INLINE
+    CTUView ctu_view() const noexcept {
+        return {
+            ctu_enabled,
+            ctu_fxL, ctu_fxR, ctu_fx,
+            ctu_fyL, ctu_fyR, ctu_fy,
+            ctu_fzL, ctu_fzR, ctu_fz,
+            ctu_xL_bak, ctu_xR_bak,
+            ctu_yL_bak, ctu_yR_bak,
+            ctu_zL_bak, ctu_zR_bak
+        };
+    }
+
+    [[nodiscard]] AETHER_INLINE
+    bool ctu_active() const noexcept {
+        return ctu_enabled;
+    }
+
+private:
+    static AETHER_INLINE GridState fill_grid(const Config& c) noexcept {
+        GridState g;
+        g.dx = (c.x_end - c.x_start) / c.x_count;
+        g.dy = (c.y_end - c.y_start) / c.y_count;
+        g.dz = (c.z_end - c.z_start) / c.z_count;
+
+        g.nx = c.x_count;
+        g.ny = c.y_count;
+        g.nz = c.z_count;
+
+        g.x_min = c.x_start; g.x_max = c.x_end;
+        g.y_min = c.y_start; g.y_max = c.y_end;
+        g.z_min = c.z_start; g.z_max = c.z_end;
+
+        g.quad  = c.num_quad;
+        g.ng    = c.num_ghost;
+        g.gamma = c.gamma;
+        return g;
+    }
+
+    static AETHER_INLINE TimeState fill_time(const Config& c) noexcept {
+        TimeState t;
+        t.dt       = 0.0;
+        t.t_start  = c.t_start;
+        t.t_end    = c.t_end;
+        t.t        = c.t_start;
+        t.cfl      = c.cfl;
+        t.step     = 0;
+        t.RK_stage = 0;
+        return t;
+    }
+
+
+};
+
+// ============================================================
+// Active build alias
+// ============================================================
+
+using Simulation = SimulationD<AETHER_DIM>;
+using CellView      = Simulation::CellView;
+using DirView       = Simulation::DirView;
+using FaceView      = Simulation::FaceView;
+
+} // namespace aether::core

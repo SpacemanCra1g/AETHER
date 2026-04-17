@@ -7,4 +7,5 @@ namespace aether::core {
 struct Config;
 void display_run_parameters(Config &cfg,std::ostream& os = std::cout);
 void load_run_parameters(Config& cfg);
+void check_run_parameters(Config& cfg);
 }
