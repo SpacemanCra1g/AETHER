@@ -26,13 +26,14 @@ static AETHER_INLINE void load_sr_shocktube(Sim &sim){
 
     Kokkos::parallel_for(
         "Load SRHD shocktube initial conditions" 
-      , loop::cells_interior(sim)
+      , loop::cells_full(sim)
       , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
             , const int i)
         {
-        const bool left = (x_min + (0.5+(i-ng))*dx < domain_mid);
+        double x = (x_min + .5*dx +(i-ng)*dx );
+        const bool left = (x < domain_mid);
         prim(P::RHO,0,0,i) = 1.0;
         prim(P::VX,0,0,i) = left ? 0.9 : 0.9;
         prim(P::VY,0,0,i) = left ? 0.9 : 0.9;
@@ -60,7 +61,7 @@ static AETHER_INLINE void load_dmr(Sim &sim){
 
     Kokkos::parallel_for(
          "Load DMR initial conditoins"
-        , loop::cells_interior(sim)
+        , loop::cells_full(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
@@ -104,7 +105,7 @@ static AETHER_INLINE void load_sedov(Sim &sim){
         
         Kokkos::parallel_for(
              "Load 2D Sedov Inits"
-            , loop::cells_interior(sim)
+            , loop::cells_full(sim)
             , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
@@ -135,7 +136,7 @@ static AETHER_INLINE void load_sedov(Sim &sim){
 
         Kokkos::parallel_for(
             "Load Initial conditions for Sedov problem"
-            , loop::cells_interior(sim)
+            , loop::cells_full(sim)
             , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
@@ -172,7 +173,7 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
 
     Kokkos::parallel_for(
         "load_1D_sod_initial_conditions"
-        , loop::cells_interior(sim)
+        , loop::cells_full(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
@@ -200,7 +201,7 @@ static AETHER_INLINE void load_sod_y(Sim &sim){
 
     Kokkos::parallel_for(
         "Load Sod_y initial conditions"
-        , loop::cells_interior(sim)
+        , loop::cells_full(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j
@@ -226,7 +227,7 @@ static AETHER_INLINE void load_sod_z(Sim &sim){
     
     Kokkos::parallel_for(
         "Load Sod_z initial conditions"
-        , loop::cells_interior(sim)
+        , loop::cells_full(sim)
         , KOKKOS_LAMBDA(
               [[maybe_unused]] const int k
             , [[maybe_unused]] const int j

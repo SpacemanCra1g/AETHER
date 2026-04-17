@@ -9,9 +9,10 @@
 #include <fenv.h>
 
 int main() {
-    feenableexcept(FE_INVALID);
+
     using namespace aether::core;
     {
+    // feenableexcept(FE_INVALID);        
         Kokkos::initialize();
 
         Config cfg;
@@ -25,7 +26,7 @@ int main() {
         auto domain = sim.view();        
 
         // This is really inefficient and bad. Learn to live with it, DMR is a hell of a drug
-        boundary_conditions(sim,domain.prim);
+        // boundary_conditions(sim,domain.prim);
         aether::phys::prims_to_cons_domain(sim);
         boundary_conditions(sim,domain.cons);        
 
@@ -33,7 +34,6 @@ int main() {
             aether::phys::set_dt(sim);
             std::cout << "The time step is " << sim.time.dt
                       << " The current time is " << sim.time.t << "\n";
-
             Time_stepper(sim);
             boundary_conditions(sim, domain.cons);
             aether::phys::cons_to_prims_domain(sim);

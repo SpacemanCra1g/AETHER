@@ -354,6 +354,7 @@ AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
     using exec_space = typename Sim::policy_type::execution_space;
     using P = aether::prim::Prim;
 
+    double Gamma = sim.grid.gamma;
     const int ib = sim.cells.ibegin();
     const int ie = sim.cells.iend();
     const int jb = sim.cells.jbegin();
@@ -366,8 +367,6 @@ AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
 
     const double x0  = 1.0 / 6.0;
     const double alpha = M_PI/3.0;
-    const double post_shock_u = 8.25 * std::sin(alpha);
-    const double post_shock_v = -8.25 * std::cos(alpha); 
     const double inv_sin_alpha = 1.0/std::sin(alpha);
     const double inv_tan_alpha = 1.0/std::tan(alpha);
 
@@ -376,11 +375,21 @@ AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
     const double vx_pre   = 0.0;
     const double vy_pre   = 0.0;
     const double p_pre    = 1.0;
+    double v2 = vx_pre*vx_pre + vy_pre*vy_pre;
+
+    const double mx_pre = vx_pre*rho_pre;
+    const double my_pre = vy_pre*rho_pre;
+    const double E_pre = p_pre / (Gamma-1.0) + 0.5*rho_pre*v2;
 
     const double rho_post = 8.0;
-    const double vx_post  = post_shock_u;
-    const double vy_post  = post_shock_v;
+    const double vx_post  = 8.25 * std::sin(alpha);
+    const double vy_post  = -8.25 * std::cos(alpha); 
     const double p_post   = 116.5;
+
+    v2 = vx_post*vx_post + vy_post*vy_post;
+    const double mx_post  = vx_post*rho_post;
+    const double my_post  = vy_post*rho_post;
+    const double E_post   = p_post / (Gamma-1.0) + 0.5*rho_post*v2;
 
     Kokkos::parallel_for(
         "Dim=2 DoubleMachReflection BCs",
@@ -393,18 +402,18 @@ AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
             // Left boundary (post shock)
             if (i < ib ){
                 var(P::RHO,0,j,i) = rho_post;
-                var(P::VX,0,j,i) = vx_post;
-                var(P::VY,0,j,i) = vy_post;
-                var(P::P,0,j,i) = p_post;
+                var(P::VX,0,j,i) = mx_post;
+                var(P::VY,0,j,i) = my_post;
+                var(P::P,0,j,i) = E_post;
             }
 
             // Bottom boundary (post shock & recflecting)
             else if (j < jb && i >= ib && i < ie){
                 if (x <= x0){
                     var(P::RHO,0,j,i) = rho_post;
-                    var(P::VX,0,j,i) = vx_post;
-                    var(P::VY,0,j,i) = vy_post;
-                    var(P::P,0,j,i) = p_post;
+                    var(P::VX,0,j,i) = mx_post;
+                    var(P::VY,0,j,i) = my_post;
+                    var(P::P,0,j,i) = E_post;
                 } else{
                     var(P::RHO,0,j,i) = var(P::RHO, 0, 2*ng - j -1, i);
                     var(P::VX,0,j,i)  = var(P::VX,  0, 2*ng - j -1, i);
@@ -418,23 +427,23 @@ AETHER_INLINE void DoubleMachReflection(Sim& sim, typename Sim::CellView var) {
                 double xs = 10.0*t*inv_sin_alpha + x0 + inv_tan_alpha;
                 if (x < xs){
                     var(P::RHO,0,j,i) = rho_post;
-                    var(P::VX,0,j,i) = vx_post;
-                    var(P::VY,0,j,i) = vy_post;
-                    var(P::P,0,j,i) = p_post;
+                    var(P::VX,0,j,i) = mx_post;
+                    var(P::VY,0,j,i) = my_post;
+                    var(P::P,0,j,i) = E_post;
                 } else{
                     var(P::RHO,0,j,i) = rho_pre;
-                    var(P::VX,0,j,i) = vx_pre;
-                    var(P::VY,0,j,i) = vy_pre;
-                    var(P::P,0,j,i) = p_pre;
+                    var(P::VX,0,j,i) = mx_pre;
+                    var(P::VY,0,j,i) = my_pre;
+                    var(P::P,0,j,i) = E_pre;
                 }
             }
 
             // Right boundary (pre-shock state)
             else if (i >= ie){
                 var(P::RHO,0,j,i) = rho_pre;
-                var(P::VX,0,j,i) = vx_pre;
-                var(P::VY,0,j,i) = vy_pre;
-                var(P::P,0,j,i) = p_pre;
+                var(P::VX,0,j,i) = mx_pre;
+                var(P::VY,0,j,i) = my_pre;
+                var(P::P,0,j,i) = E_pre;
             }
         }
     );

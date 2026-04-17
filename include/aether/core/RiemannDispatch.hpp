@@ -2,7 +2,6 @@
 
 #include "aether/core/Kokkos_loopBounds.hpp"
 #include <Kokkos_Core.hpp>
-
 #include <aether/core/config.hpp>
 #include <aether/core/simulation.hpp>
 #include <aether/core/prim_layout.hpp>
@@ -146,6 +145,8 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
                 if constexpr (solv == riemann::hll) {
                     F = hll(L, R, gamma);
+                } else if constexpr (solv == riemann::hllc) {
+                    F = hllc(L, R, gamma);
                 }
 
                 // Store flux back in directional component ordering
@@ -182,7 +183,15 @@ void Riemann_dispatch(Sim& sim, V& v) {
                 Riemann_sweep<riemann::hll, sweep_dir::z>(sim, v);
             }
             break;
-
+        case riemann::hllc:
+            Riemann_sweep<riemann::hllc, sweep_dir::x>(sim, v);
+            if constexpr (Sim::dim > 1) {
+                Riemann_sweep<riemann::hllc, sweep_dir::y>(sim, v);
+            }
+            if constexpr (Sim::dim > 2) {
+                Riemann_sweep<riemann::hllc, sweep_dir::z>(sim, v);
+            }
+            break;
         default:
             throw std::runtime_error("Riemann_dispatch: unknown Riemann solver");
     }

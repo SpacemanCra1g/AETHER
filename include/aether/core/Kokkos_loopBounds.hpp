@@ -24,7 +24,7 @@ auto riemann_sweep_policy(const Sim& sim){
     int halo=0;
 
     if (sim.cfg.solve==aether::core::solver::fog){
-        halo = sim.cells.ng - 1;
+        halo = sim.cells.ng - 2;
     } else if (sim.cfg.solve==aether::core::solver::plm){
         halo = sim.cells.ng - 2;
     } else if (sim.cfg.solve==aether::core::solver::ppm){
