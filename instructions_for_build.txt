@@ -1,0 +1,51 @@
+--------------------------------------------------------------
+---------- FIRST TIME BUILD INSTRUCTIONS FOR AETHER ----------
+--------------------------------------------------------------
+
+
+After cloning the repo you must pull in kokkos.
+This is linked as a git submodule in the tpls/kokkos dir.
+To pull in this module run
+
+<git submodule update --init --recursive>
+
+Then verify that tpls/kokkos is populated
+
+after that you should be able to configure your first build via: 
+<cmake -S . -B 'build-dir' '-KOKKOS/AETHER-FLAGS' >
+
+An example shell script containing some pre-made configs can be found in "script_build.sh" 
+
+WARNING: Some of these flags are mutually exclusive, so be careful when customizing 
+
+WARNING: Some of those flags are specific to certain GPU architecture's 
+    (i.e. DKokkos_ARCH_AMPERE86 for NVIDA A2000 family of GPUS) 
+    So make sure to look up the flags required for your GPU 
+
+build your directory with 
+    <cmake --build 'build-dir' -j> 
+If you name your directories following the convention " build-'name_here' " 
+    then the rebuild_all.sh script will recursively build all dirs,
+    this is useful when you make a source file change and wish to update all builds 
+
+
+Runtime configuration is done in the 'aether_config.cfg' file. 
+
+After configuration, run your executable via <./build-'your_dir'/aether.ex>
+
+plotting can be done via the included python script "plot_aether_snapshot.py" 
+
+This script accepts the following flags: 
+    --var                       {0, 1,..., num_var-1          | default = 0}
+    --plane                     {xy, xz, yz                   | default = None}
+    --slice-axis                {x, y, z                      | default = None}
+    --contours                  {num_contours                 | default = 0}
+    --snapshot                  {"path_to_data_file"          | default = None}
+    --trim-ghosts               {true / false                 | default = false}
+    --title                     {"Optional image title"       | default = "title"}
+    --slice-index               {N                            | default = None}
+    --xrange                    {"XMIN", "XMAX"               | default = ALL}
+    --yrange                    {"YMIN", "YMAX"               | default = ALL}
+    --zrange                    {"ZMIN", "XMAX"               | default = ALL}
+    --plane-index               {int                          | default = middle}
+
