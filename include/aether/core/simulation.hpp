@@ -28,6 +28,7 @@ struct TimeState {
     double t{0.0};
     double cfl{0.0};
     int step{0};
+    int write_num{0};
     int RK_stage{0};
 };
 
@@ -157,12 +158,13 @@ private:
 
     static AETHER_INLINE TimeState fill_time(const Config& c) noexcept {
         TimeState t;
-        t.dt       = 0.0;
-        t.t_start  = c.t_start;
-        t.t_end    = c.t_end;
-        t.t        = c.t_start;
-        t.cfl      = c.cfl;
-        t.step     = 0;
+        t.dt        = 0.0;
+        t.t_start   = c.t_start;
+        t.t_end     = c.t_end;
+        t.t         = c.t_start;
+        t.cfl       = c.cfl;
+        t.step      = 0;
+        t.write_num = -1;
         t.RK_stage = 0;
         return t;
     }
@@ -297,13 +299,14 @@ private:
 
     static AETHER_INLINE TimeState fill_time(const Config& c) noexcept {
         TimeState t;
-        t.dt       = 0.0;
-        t.t_start  = c.t_start;
-        t.t_end    = c.t_end;
-        t.t        = c.t_start;
-        t.cfl      = c.cfl;
-        t.step     = 0;
-        t.RK_stage = 0;
+        t.dt        = 0.0;
+        t.t_start   = c.t_start;
+        t.t_end     = c.t_end;
+        t.t         = c.t_start;
+        t.cfl       = c.cfl;
+        t.step      = 0;
+        t.write_num = -1;
+        t.RK_stage  = 0;
         return t;
     }
 };
@@ -539,13 +542,14 @@ private:
 
     static AETHER_INLINE TimeState fill_time(const Config& c) noexcept {
         TimeState t;
-        t.dt       = 0.0;
-        t.t_start  = c.t_start;
-        t.t_end    = c.t_end;
-        t.t        = c.t_start;
-        t.cfl      = c.cfl;
-        t.step     = 0;
-        t.RK_stage = 0;
+        t.dt        = 0.0;
+        t.t_start   = c.t_start;
+        t.t_end     = c.t_end;
+        t.t         = c.t_start;
+        t.cfl       = c.cfl;
+        t.step      = 0;
+        t.write_num = -1;
+        t.RK_stage  = 0;
         return t;
     }
 

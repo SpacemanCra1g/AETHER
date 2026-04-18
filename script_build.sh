@@ -95,7 +95,7 @@ cmake -S . -B build-debug \
     -DKokkos_ENABLE_CUDA=OFF \
     -DKokkos_ENABLE_THREADS=OFF \
     -DKokkos_ENABLE_SERIAL=OFF \
-    -DAETHER_DIM=2 \
+    -DAETHER_DIM=1 \
     -DAETHER_PHYSICS=Euler \
     -DENABLE_OPENMP=ON \
     -DENABLE_CUDA=OFF

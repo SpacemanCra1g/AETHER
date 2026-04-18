@@ -262,25 +262,15 @@ static bool load_output_specification(std::string &s, aether::core::Config &cfg)
     else if (write_text_lower == "true") cfg.write_text = true;
     else throw std::runtime_error("Unknown parameter in 'write_text'");
   }
-  else if (s.substr(0,11) == "write_ascii"){
-    std::string write_ascii = s.substr(11, s.length() - 11); 
+  else if (s.substr(0,12) == "write_binary"){
+    std::string write_ascii = s.substr(12, s.length() - 12); 
     std::string write_ascii_lower;
     for (std::size_t i = 0; i < write_ascii.length(); ++i){
       write_ascii_lower += std::tolower(write_ascii[i]);
     }
-    if (write_ascii_lower == "false") cfg.write_ascii = false;
-    else if (write_ascii_lower == "true") cfg.write_ascii = true;
+    if (write_ascii_lower == "false") cfg.write_binary = false;
+    else if (write_ascii_lower == "true") cfg.write_binary = true;
     else throw std::runtime_error("Unknown parameter in 'write_ascii'");
-  }
-  else if (s.substr(0,10) == "write_hdf5"){
-    std::string write_ascii = s.substr(10, s.length() - 10); 
-    std::string write_ascii_lower;
-    for (std::size_t i = 0; i < write_ascii.length(); ++i){
-      write_ascii_lower += std::tolower(write_ascii[i]);
-    }
-    if (write_ascii_lower == "false") cfg.write_hdf5 = false;
-    else if (write_ascii_lower == "true") cfg.write_hdf5 = true;
-    else throw std::runtime_error("Unknown parameter in 'write_hdf5'");
   }
   else if (s.substr(0,14) == "snapshot_every"){
     cfg.snap_shot_interval = std::stoi(s.substr(14,s.length()-14)); 
@@ -289,6 +279,12 @@ static bool load_output_specification(std::string &s, aether::core::Config &cfg)
   else if (s.substr(0,17) == "custom_output_dir"){
   cfg.output_dir= s.substr(18,s.length()-19); 
   if (cfg.output_dir.empty()) cfg.output_dir = "OutputData/";
+  return true;
+  }
+
+  else if (s.substr(0,10) == "run_prefix"){
+  cfg.prefix = s.substr(11,s.length()-12); 
+  if (cfg.prefix.empty()) cfg.prefix = "snap";
   return true;
   }
 
@@ -324,8 +320,7 @@ void display_run_parameters(Config& cfg,std::ostream& os){
     os << "Test Problem      : " << to_string(cfg.prob) <<"\n";
     os << "Output type       : ";
     if (cfg.write_text) os << "plain text: ";
-    if (cfg.write_ascii) os << "ascii file: ";
-    if (cfg.write_hdf5) os << "hdf5 file: ";
+    if (cfg.write_binary) os << "binary file: ";
     os << "\n";
     os << "Snapshot every    : " << cfg.snap_shot_interval << " time steps";
 }

@@ -19,8 +19,9 @@ namespace aether::core {
         time_stepper time_step = time_stepper::char_trace;
         boundary_conditions bc;
         limiter slope_limiter;
-        bool write_text{false}, write_ascii{false}, write_hdf5{false};
+        bool write_text{false}, write_binary{false};
         bool use_defaults;
         std::string output_dir;
+        std::string prefix;        
     };
 }
