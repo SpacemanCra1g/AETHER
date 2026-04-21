@@ -6,7 +6,6 @@
 #include <aether/physics/api.hpp>
 #include <aether/core/TemporalDispatch.hpp>
 #include <aether/io/metadata.hpp>
-#include <fenv.h>
 
 int main() {
 

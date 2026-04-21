@@ -114,8 +114,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     }
     else if (riemann_solver_lower == "hllc"){
       cfg.riem = aether::core::riemann::hllc; return true;
-    }
-    else if (riemann_solver_lower == "roe"){
+    } else if (riemann_solver_lower == "tc"){
+      cfg.riem = aether::core::riemann::tc; return true;
+    } else if (riemann_solver_lower == "roe"){
       cfg.riem = aether::core::riemann::roe; return true;
     }
     else if (riemann_solver_lower == "exact"){
@@ -220,6 +221,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     }
     else if (test_prob_lower == "sedov"){
       cfg.prob = aether::core::test_problem::sedov; return true;
+
+    } else if (test_prob_lower == "sod_contact"){
+      cfg.prob = aether::core::test_problem::sod_contact; return true;
     }
     else if (test_prob_lower == "custom"){
       cfg.prob = aether::core::test_problem::custom; return true;

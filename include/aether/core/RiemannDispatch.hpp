@@ -106,11 +106,13 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
 
     const double gamma_P = sim.grid.gamma;
     const int quad     = sim.grid.quad;
+    const double dtdx_p = sim.time.dt/sim.grid.dx;
 
     Kokkos::parallel_for(
         "Riemann_sweep",
         aether::loops::riemann_sweep_policy(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            const double dtdx = dtdx_p;
             const double gamma = gamma_P;
             for (int q = 0; q < quad; ++q) {
                 aether::phys::prims L{};
@@ -147,6 +149,8 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                     F = hll(L, R, gamma);
                 } else if constexpr (solv == riemann::hllc) {
                     F = hllc(L, R, gamma);
+                } else if constexpr (solv == riemann::tc) {
+                    F = tc(L, R, gamma, dtdx);
                 }
 
                 // Store flux back in directional component ordering
@@ -191,6 +195,9 @@ void Riemann_dispatch(Sim& sim, V& v) {
             if constexpr (Sim::dim > 2) {
                 Riemann_sweep<riemann::hllc, sweep_dir::z>(sim, v);
             }
+            break;
+        case riemann::tc:
+            Riemann_sweep<riemann::tc, sweep_dir::x>(sim, v);
             break;
         default:
             throw std::runtime_error("Riemann_dispatch: unknown Riemann solver");

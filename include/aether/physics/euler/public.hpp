@@ -6,6 +6,7 @@
 #include <aether/physics/euler/variable_structs.hpp>
 #include <aether/physics/euler/RiemannSolvers/hll.hpp>
 #include <aether/physics/euler/RiemannSolvers/hllc.hpp>
+#include <aether/physics/euler/RiemannSolvers/tc.hpp>
 
 namespace aether::physics::euler{
 

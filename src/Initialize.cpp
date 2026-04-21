@@ -161,6 +161,35 @@ static AETHER_INLINE void load_sedov(Sim &sim){
 }
 
 template<typename Sim>
+static AETHER_INLINE void load_sod_contact(Sim &sim){
+    
+    const double domain_mid = .5*(sim.grid.x_max + sim.grid.x_min);
+    const double dx = sim.grid.dx;
+    const double x_min = sim.grid.x_min;
+
+    auto domain = sim.view();
+    auto prim = domain.prim;
+    const int ng = domain.ng;
+
+    Kokkos::parallel_for(
+        "1D Sod Contact wave"
+        , loop::cells_full(sim)
+        , KOKKOS_LAMBDA(
+              [[maybe_unused]] const int k
+            , [[maybe_unused]] const int j
+            , const int i)
+        {
+            const bool left = x_min + (0.5 + (i-ng))*dx < domain_mid;
+            prim(P::RHO,0,0,i) = left ? 0.42631943 : 0.26557371;
+            prim(P::VX,0,0,i) = 0.9274526196;
+            prim(P::P,0,0,i) = 0.3031301781;
+            if constexpr (P::HAS_VY) prim(P::VY,0,0,i) = left ? 10.0 : 0.0;
+            if constexpr (P::HAS_VZ) prim(P::VZ,0,0,i) = 0.0;
+        }
+    );
+}
+
+template<typename Sim>
 static AETHER_INLINE void load_sod_shocktube(Sim &sim){
     
     const double domain_mid = .5*(sim.grid.x_max + sim.grid.x_min);
@@ -183,7 +212,7 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
             prim(P::RHO,0,0,i) = left ? 1.0 : 0.125;
             prim(P::VX,0,0,i) = 0.0;
             prim(P::P,0,0,i) = left ? 1.0 : 0.1;
-            if constexpr (P::HAS_VY) prim(P::VY,0,0,i) = 0.0;
+            if constexpr (P::HAS_VY) prim(P::VY,0,0,i) = left ? 10.0 : 0.0;
             if constexpr (P::HAS_VZ) prim(P::VZ,0,0,i) = 0.0;
         }
     );
@@ -247,6 +276,7 @@ void initialize_domain(Sim &sim){
         if constexpr (Sim::dim == 1){ 
             switch (sim.cfg.prob) {                
                 case test_problem::sod : load_sod_shocktube(sim); break;
+                case test_problem::sod_contact : load_sod_contact(sim); break;
                 default: throw std::runtime_error("Invalid Test problem config");
             };
         }
