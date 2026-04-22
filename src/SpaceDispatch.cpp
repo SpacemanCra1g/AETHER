@@ -50,7 +50,7 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
             for (int c = 0; c < numvar; ++c) {
                 const double u = prim(c, k, j, i);
                 for (int q = 0; q < quad; ++q) {
-                    FR(c, q, k     , j     , i     ) = u;
+                    FR(c, q, k     , j     , i     ) = u; // 
                     FL(c, q, k + k0, j + j0, i + i0) = u;
                 }
             }
@@ -507,29 +507,26 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
 // ---------- Basic r=3 GP functionality ----------
 AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
     constexpr int numvar = aether::phys_ct::numvar;
-    constexpr int radius = 1;
-    constexpr int stencil_size = 2 * radius + 1; // 7x7
+    const int radius = sim.cfg.gp_radius;
+    const int gp_input_size = sim.cfg.gp_input_size();
+    const int stencil_size = 2 * radius + 1;
     
     auto view = sim.view();
     auto prim = view.prim;
-    const int nx = view.nx;
-    const int ny = view.ny;
-    const int ng = view.ng;
     
     // Loop over interior cells (excluding ghost cells)
     Kokkos::parallel_for(
-        "gp_2d_stencil",
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>(
-            {ng, ng}, {ng + ny, ng + nx}
-        ),
-        KOKKOS_LAMBDA(const int j, const int i) {
-            
-            double stencil[numvar][stencil_size*stencil_size];
+        "FOG_sweep",
+        loop::cells_full(sim),
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+
+            double stencil[numvar][gp_input_size];
             
             for (int c = 0; c < numvar; ++c) {
                 for (int di = -radius; di <= radius; ++di) {
                     for (int dj = -radius; dj <= radius; ++dj) {
-                        stencil[c][ (di + radius) * stencil_size + (dj + radius) ] = prim(c, 0, j + dj, i + di);
+                        const int stencil_index = (di + radius) * stencil_size + (dj + radius);
+                        stencil[c][stencil_index] = prim(c, 0, j + dj, i + di);
                     }
                 }
             }
@@ -538,33 +535,33 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
             double stencil_mean[numvar];
             for (int c = 0; c < numvar; ++c) {
                 stencil_mean[c] = 0.0;
-                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                for (int k = 0; k < gp_input_size; ++k) {
                     stencil_mean[c] += stencil[c][k];
                 }
-                stencil_mean[c] /= (stencil_size * stencil_size);
+                stencil_mean[c] /= (gp_input_size);
             }
             
             // Subtract mean from stencil values to get deviations
-            double stencil_dev[numvar][stencil_size*stencil_size];
+            double stencil_dev[numvar][gp_input_size];
             for (int c = 0; c < numvar; ++c) {
-                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                for (int k = 0; k < gp_input_size; ++k) {
                     stencil_dev[c][k] = stencil[c][k] - stencil_mean[c];
                 }
             }
             
             // Compute alpha = K^-1 @ stencil using Cholesky factorization
             // where gp_L_mat contains L such that K = L*L^T
-            double alpha[numvar][stencil_size*stencil_size];
+            double alpha[numvar][gp_input_size];
             for (int c = 0; c < numvar; ++c) {
-                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                for (int k = 0; k < gp_input_size; ++k) {
                     alpha[c][k] = 0.0;
                 }
             }
             
             for (int c = 0; c < numvar; ++c) {
                 // First, solve L*y = stencil_dev for y (forward substitution)
-                double y[stencil_size*stencil_size];
-                for (int k = 0; k < stencil_size*stencil_size; ++k) {
+                double y[gp_input_size];
+                for (int k = 0; k < gp_input_size; ++k) {
                     double sum = stencil_dev[c][k];
                     for (int m = 0; m < k; ++m) {
                         sum -= view.gp_L_mat(k, m) * y[m];
@@ -573,23 +570,23 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                 }
                 
                 // Then, solve L^T*alpha = y for alpha (backward substitution)
-                for (int k = stencil_size*stencil_size - 1; k >= 0; --k) {
+                for (int k = gp_input_size - 1; k >= 0; --k) {
                     double sum = y[k];
-                    for (int m = k + 1; m < stencil_size*stencil_size; ++m) {
+                    for (int m = k + 1; m < gp_input_size; ++m) {
                         sum -= view.gp_L_mat(m, k) * alpha[c][m];
                     }
                     alpha[c][k] = sum / view.gp_L_mat(k, k);
                 }
             }
             // for (int c = 0; c < numvar; ++c) {
-            //     for (int k = 0; k < stencil_size*stencil_size; ++k) {
+            //     for (int k = 0; k < gp_input_size; ++k) {
             //         printf("alpha[%d][%d] = %f\n", c, k, alpha[c][k]);
             //     }
             // }   
             
             // Compute Marginal Log Likelihood (MLL) for each component
             double mll;
-            const int n = stencil_size * stencil_size;
+            const int n = gp_input_size;
             const double log_2pi = 1.8378770664093453; // log(2*pi)
             bool use_fallback = false;
             
@@ -617,21 +614,7 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
             // Set the fallback mask for this cell
             // view.gp_fallback_mask(j - ng, i - ng) = use_fallback;
 
-            if (use_fallback) {
-                // Use FOG fallback when MLL indicates poor GP model quality
-                for (int c = 0; c < numvar; ++c) {
-                    const double u = prim(c, 0, j, i);
-                    for (int q = 0; q < view.quad; ++q) {
-                        // X-direction fluxes (like FOG_sweep<sweep_dir::x>)
-                        view.fxR(c, q, 0, j, i) = u;
-                        view.fxL(c, q, 0, j, i+1) = u;
-                        
-                        // Y-direction fluxes (like FOG_sweep<sweep_dir::y>)
-                        view.fyR(c, q, 0, j, i) = u;
-                        view.fyL(c, q, 0, j+1, i) = u;
-                    }
-                }
-            } else {
+            if (!use_fallback || false) {
                 // Use GP predictions when MLL indicates good model quality
                 for (int c = 0; c < numvar; ++c) {
                     double pred_l = 0.0;
@@ -673,6 +656,8 @@ void Space_solve(Simulation& Sim) {
             break;
         case solver::gp:
             if constexpr (AETHER_DIM == 2) {
+                FOG_sweep<sweep_dir::x>(Sim);
+                FOG_sweep<sweep_dir::y>(Sim);
                 gp_2d(Sim);
             }
             break;

@@ -179,8 +179,6 @@ template<>
 struct SimulationD<2> {
     static constexpr int dim = 2;
     static constexpr int numvar = aether::phys_ct::numvar;
-    static constexpr int gp_stencil_radius = 1;  // 7x7 stencil
-    static constexpr int gp_matrix_size = gp_stencil_radius * 2 + 1;    // (2*1+1)^2 = 9
 
     using policy_type = aether::kokkos_cfg::Policy<2, AETHER_PHYSICS_KIND>;
 
@@ -268,11 +266,11 @@ struct SimulationD<2> {
           fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           ctu_enabled(compute_ctu_enabled(config)),
-          gp_L_mat("gp_K_mat", gp_matrix_size, gp_matrix_size),
-          gp_k_star_l("gp_k_star_l", gp_matrix_size),
-          gp_k_star_r("gp_k_star_r", gp_matrix_size),
-          gp_k_star_u("gp_k_star_u", gp_matrix_size),
-          gp_k_star_d("gp_k_star_d", gp_matrix_size)
+          gp_L_mat("gp_L_mat", cfg.gp_input_size(), cfg.gp_input_size()),
+          gp_k_star_l("gp_k_star_l", cfg.gp_input_size()),
+          gp_k_star_r("gp_k_star_r", cfg.gp_input_size()),
+          gp_k_star_u("gp_k_star_u", cfg.gp_input_size()),
+          gp_k_star_d("gp_k_star_d", cfg.gp_input_size())
     {
         init_gp_matrices(config);
     }
@@ -336,13 +334,14 @@ struct SimulationD<2> {
     }
 
     void init_gp_matrices(const Config& config) noexcept {
+        const int gp_matrix_size = config.gp_input_size();
         for (int i = 0; i < gp_matrix_size; ++i) {
             for (int j = 0; j < gp_matrix_size; ++j) {
-                int ix = (i % (2*gp_stencil_radius+1)) - gp_stencil_radius;
-                int iy = (i / (2*gp_stencil_radius+1)) - gp_stencil_radius;
+                int ix = (i % (2*config.gp_radius + 1)) - config.gp_radius;
+                int iy = (i / (2*config.gp_radius + 1)) - config.gp_radius;
 
-                int jx = (j % (2*gp_stencil_radius+1)) - gp_stencil_radius;
-                int jy = (j / (2*gp_stencil_radius+1)) - gp_stencil_radius;
+                int jx = (j % (2*config.gp_radius + 1)) - config.gp_radius;
+                int jy = (j / (2*config.gp_radius + 1)) - config.gp_radius;
 
 
                 gp_L_mat(i, j) = compute_gp_weight_ell1_2d(ix, iy, jx, jy);
@@ -354,8 +353,8 @@ struct SimulationD<2> {
         cholesky_inplace(gp_L_mat);
         
         for (int i = 0; i < gp_matrix_size; ++i) {
-            int ix = (i % (2*gp_stencil_radius+1)) - gp_stencil_radius;
-            int iy = (i / (2*gp_stencil_radius+1)) - gp_stencil_radius;
+            int ix = (i % (2*config.gp_radius + 1)) - config.gp_radius;
+            int iy = (i / (2*config.gp_radius + 1)) - config.gp_radius;
 
             gp_k_star_l(i) = compute_gp_weight_ell2_2d(ix, iy, -0.5, 0.0);
             gp_k_star_r(i) = compute_gp_weight_ell2_2d(ix, iy, 0.5, 0.0);
@@ -365,57 +364,37 @@ struct SimulationD<2> {
     }
 
     // From GP Recipe paper, this is an exact 
-    // float compute_gp_weight_ell1_2d(float ix, float iy, float jx, float jy) const noexcept {
-    //     float ell = 6.0;  // length scale TODO: make modifiable via config
-    //     float ell_sq = ell * ell;
-    //     float ell_sqrt_2 = ell * std::sqrt(2.0);
-    //     float delta_x = ix - jx;
-    //     float delta_y = iy - jy;
-
-    //     float x_contrib = ell_sq * (
-    //         (delta_x + 1) / ell_sqrt_2 * std::erf((delta_x + 1) / ell_sqrt_2) + (delta_x - 1) / ell_sqrt_2 * std::erf((delta_x - 1) / ell_sqrt_2) +
-    //         (1.0 / std::sqrt(M_PI)) * (std::exp(-0.5 * (delta_x + 1) * (delta_x + 1) / ell_sq) + std::exp(-0.5 * (delta_x - 1) * (delta_x - 1) / ell_sq)) +
-    //         -2.0 * ((delta_x / ell_sqrt_2) * std::erf(delta_x / ell_sqrt_2) + (1.0 / std::sqrt(M_PI)) * std::exp(-0.5 * delta_x * delta_x / ell_sq))
-    //     );
-    //     float y_contrib = ell_sq * (
-    //         (delta_y + 1) / ell_sqrt_2 * std::erf((delta_y + 1) / ell_sqrt_2) + (delta_y - 1) / ell_sqrt_2 * std::erf((delta_y - 1) / ell_sqrt_2) +
-    //         (1.0 / std::sqrt(M_PI)) * (std::exp(-0.5 * (delta_y + 1) * (delta_y + 1) / ell_sq) + std::exp(-0.5 * (delta_y - 1) * (delta_y - 1) / ell_sq)) +
-    //         -2.0 * ((delta_y / ell_sqrt_2) * std::erf(delta_y / ell_sqrt_2) + (1.0 / std::sqrt(M_PI)) * std::exp(-0.5 * delta_y * delta_y / ell_sq))
-    //     );
-
-    //     return M_PI * x_contrib * y_contrib;
-    // }
-
-    // Standard Squared Exponential (SE) kernel
     float compute_gp_weight_ell1_2d(float ix, float iy, float jx, float jy) const noexcept {
         float ell = 6.0;  // length scale TODO: make modifiable via config
-        float sigma_sq = 1.0;  // signal variance
+        float ell_sq = ell * ell;
+        float ell_sqrt_2 = ell * std::sqrt(2.0);
         float delta_x = ix - jx;
         float delta_y = iy - jy;
-        float dist_sq = delta_x * delta_x + delta_y * delta_y;
-        return sigma_sq * std::exp(-0.5 * dist_sq / (ell * ell));
+
+        float x_contrib = ell_sq * (
+            (delta_x + 1) / ell_sqrt_2 * std::erf((delta_x + 1) / ell_sqrt_2) + (delta_x - 1) / ell_sqrt_2 * std::erf((delta_x - 1) / ell_sqrt_2) +
+            (1.0 / std::sqrt(M_PI)) * (std::exp(-0.5 * (delta_x + 1) * (delta_x + 1) / ell_sq) + std::exp(-0.5 * (delta_x - 1) * (delta_x - 1) / ell_sq)) +
+            -2.0 * ((delta_x / ell_sqrt_2) * std::erf(delta_x / ell_sqrt_2) + (1.0 / std::sqrt(M_PI)) * std::exp(-0.5 * delta_x * delta_x / ell_sq))
+        );
+        float y_contrib = ell_sq * (
+            (delta_y + 1) / ell_sqrt_2 * std::erf((delta_y + 1) / ell_sqrt_2) + (delta_y - 1) / ell_sqrt_2 * std::erf((delta_y - 1) / ell_sqrt_2) +
+            (1.0 / std::sqrt(M_PI)) * (std::exp(-0.5 * (delta_y + 1) * (delta_y + 1) / ell_sq) + std::exp(-0.5 * (delta_y - 1) * (delta_y - 1) / ell_sq)) +
+            -2.0 * ((delta_y / ell_sqrt_2) * std::erf(delta_y / ell_sqrt_2) + (1.0 / std::sqrt(M_PI)) * std::exp(-0.5 * delta_y * delta_y / ell_sq))
+        );
+
+        return M_PI * x_contrib * y_contrib;
     }
 
-    // float compute_gp_weight_ell2_2d(float ix, float iy, float jx, float jy) const noexcept {
-    //     float ell = 6.0;  // length scale TODO: make modifiable via config
-    //     float ell_sqrt_2 = ell * std::sqrt(2.0);
-    //     float delta_x = ix - jx;
-    //     float delta_y = iy - jy;
-
-    //     float x_contrib = ell * std::erf((delta_x + 0.5)/ell_sqrt_2) - std::erf((delta_x - 0.5)/ell_sqrt_2);
-    //     float y_contrib = ell * std::erf((delta_y + 0.5)/ell_sqrt_2) - std::erf((delta_y - 0.5)/ell_sqrt_2);
-
-    //     return M_PI * 0.5 * x_contrib * y_contrib;
-    // }
-
-    // Standard Squared Exponential (SE) kernel for prediction points
     float compute_gp_weight_ell2_2d(float ix, float iy, float jx, float jy) const noexcept {
         float ell = 6.0;  // length scale TODO: make modifiable via config
-        float sigma_sq = 1.0;  // signal variance
+        float ell_sqrt_2 = ell * std::sqrt(2.0);
         float delta_x = ix - jx;
         float delta_y = iy - jy;
-        float dist_sq = delta_x * delta_x + delta_y * delta_y;
-        return sigma_sq * std::exp(-0.5 * dist_sq / (ell * ell));
+
+        float x_contrib = ell * (std::erf((delta_x + 0.5f) / ell_sqrt_2) - std::erf((delta_x - 0.5f) / ell_sqrt_2));
+        float y_contrib = ell * (std::erf((delta_y + 0.5f) / ell_sqrt_2) - std::erf((delta_y - 0.5f) / ell_sqrt_2));
+
+        return M_PI * 0.5 * x_contrib * y_contrib;
     }
 
 private:
