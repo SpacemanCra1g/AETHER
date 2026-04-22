@@ -170,6 +170,9 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     else if (space_solver_lower == "weno5"){
       cfg.solve= aether::core::solver::weno5; return true;
     }
+    else if (space_solver_lower == "gp"){
+      cfg.solve= aether::core::solver::gp; return true;
+    }
     else {
       throw std::runtime_error("Unknown Space Solver selection " + space_solver_lower);
       return false;
@@ -198,6 +201,10 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
   }
   else if (s.substr(0,21) == "num_quadrature_points"){
     cfg.num_quad = std::stoi(s.substr(21,s.length()-21)); 
+    return true;
+  }
+  else if (s.substr(0,9) == "gp_radius"){
+    cfg.gp_radius = std::stoi(s.substr(9,s.length()-9));
     return true;
   }
   else if (s.substr(0,12) == "test_problem"){

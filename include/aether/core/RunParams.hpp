@@ -13,6 +13,7 @@ namespace aether::core {
         int snap_shot_interval{0};
         int num_ghost{0};
         int num_quad{0};
+        int gp_radius{3};
         test_problem prob;
         riemann riem = riemann::hll;
         solver solve = solver::fog;
@@ -20,6 +21,9 @@ namespace aether::core {
         boundary_conditions bc;
         limiter slope_limiter;
         bool write_text{false}, write_binary{false};
+        int gp_input_size() const noexcept {
+            return (2 * gp_radius + 1)*(2 * gp_radius + 1);
+        }
         bool use_defaults;
         std::string output_dir;
         std::string prefix;        
