@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Optional
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from .config import PlotContext
-from .fields import prepare_field_1d
+from .fields import prepare_field_1d, get_contact_wave_field
 from .io import LoadedSnapshot
 
 
@@ -36,6 +37,36 @@ def plot_snapshot_1d(ctx: PlotContext,
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(field.x, field.values)
+
+    if ctx.args.show_contact_wave:
+        contact = get_contact_wave_field(snapshot)
+        if contact is not None:
+            if contact.ndim != 1:
+                raise ValueError(f"Expected 1D contact_wave field, got shape {contact.shape}")
+
+            mask = np.isfinite(contact) & (contact > 0.5)
+            if np.any(mask):
+                finite_vals = field.values[np.isfinite(field.values)]
+                if finite_vals.size > 0:
+                    ymin = float(np.min(finite_vals))
+                    ymax = float(np.max(finite_vals))
+                    yspan = ymax - ymin
+                    if yspan <= 0.0:
+                        yspan = max(abs(ymax), 1.0)
+                else:
+                    ymax = 1.0
+                    yspan = 1.0
+
+                y_marker = ymax + 0.05 * yspan
+                ax.scatter(
+                    field.x[mask],
+                    np.full(np.count_nonzero(mask), y_marker),
+                    color="red",
+                    s=18,
+                    zorder=5,
+                )
+
+                ax.set_ylim(top=ymax + 0.12 * yspan)
 
     ax.set_xlabel(field.xlabel)
     ax.set_ylabel(field.ylabel)

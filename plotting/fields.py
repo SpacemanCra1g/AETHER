@@ -23,17 +23,6 @@ def nearest_index(vec: np.ndarray, value: float) -> int:
 
 
 def get_var_field(snapshot: LoadedSnapshot, var: int) -> np.ndarray:
-    """
-    Extract one variable from the loaded snapshot.
-
-    Internal snapshot storage convention:
-        data.shape == (numvar, nz, ny, nx)
-
-    Returns:
-        dim=1 -> shape (nx,)
-        dim=2 -> shape (ny, nx)
-        dim=3 -> shape (nz, ny, nx)
-    """
     data = snapshot.data
 
     if data.ndim != 4:
@@ -55,13 +44,27 @@ def get_var_field(snapshot: LoadedSnapshot, var: int) -> np.ndarray:
     return field
 
 
-def build_axis_1d(ctx: PlotContext, n: int) -> tuple[np.ndarray, str]:
-    """
-    Build the 1D plotting axis from metadata.
+def get_contact_wave_field(snapshot: LoadedSnapshot) -> Optional[np.ndarray]:
+    if snapshot.contact_wave is None:
+        return None
 
-    If ghost cells are present in the loaded field, extend the coordinate
-    axis beyond the physical interior domain using dx and ng.
-    """
+    field = np.asarray(snapshot.contact_wave)
+
+    if field.ndim != 3:
+        raise ValueError(
+            f"Expected snapshot.contact_wave to have rank 3 as (nz,ny,nx), got shape {field.shape}"
+        )
+
+    nz, ny, nx = field.shape
+
+    if nz == 1 and ny == 1:
+        return field[0, 0, :]
+    if nz == 1:
+        return field[0, :, :]
+    return field
+
+
+def build_axis_1d(ctx: PlotContext, n: int) -> tuple[np.ndarray, str]:
     nx = ctx.meta.nx
     ng = ctx.meta.ng
     dx = ctx.meta.dx

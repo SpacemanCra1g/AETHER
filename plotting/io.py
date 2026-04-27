@@ -12,10 +12,6 @@ import numpy as np
 from .config import PlotContext
 
 
-# ============================================================
-# Binary snapshot header
-# ============================================================
-
 AETHER_MAGIC = 0x4145544845523031  # "AETHER01"
 SNAPSHOT_HEADER_STRUCT = struct.Struct("<QII d Q")
 SNAPSHOT_HEADER_SIZE = SNAPSHOT_HEADER_STRUCT.size
@@ -41,15 +37,12 @@ class SnapshotFileSet:
 class LoadedSnapshot:
     step: int
     path: Path
-    format_name: str              # "binary" or "plain_txt"
+    format_name: str
     time: Optional[float]
     header: Optional[BinarySnapshotHeader]
     data: np.ndarray
+    contact_wave: Optional[np.ndarray] = None
 
-
-# ============================================================
-# Filename parsing and discovery
-# ============================================================
 
 def _snapshot_regex(prefix: str, ext: str) -> re.Pattern[str]:
     return re.compile(rf"^{re.escape(prefix)}_(\d{{6}}){re.escape(ext)}$")
@@ -94,10 +87,6 @@ def discover_snapshots(ctx: PlotContext) -> list[SnapshotFileSet]:
     return [found[k] for k in sorted(found.keys())]
 
 
-# ============================================================
-# Snapshot selection
-# ============================================================
-
 def choose_snapshot_file(ctx: PlotContext,
                          requested_step: Optional[int] = None,
                          prefer_binary: bool = True) -> Path:
@@ -130,10 +119,6 @@ def choose_snapshot_file(ctx: PlotContext,
         f"Snapshot step {target.step} exists, but no readable file was found."
     )
 
-
-# ============================================================
-# Binary reading
-# ============================================================
 
 def read_binary_snapshot_header(path: Path) -> BinarySnapshotHeader:
     with path.open("rb") as f:
@@ -205,12 +190,9 @@ def load_binary_snapshot(path: Path,
         time=hdr.time,
         header=hdr,
         data=arr,
+        contact_wave=None,
     )
 
-
-# ============================================================
-# Plaintext reading
-# ============================================================
 
 def _parse_plaintext_header(lines: list[str]) -> dict[str, object]:
     info: dict[str, object] = {
@@ -257,28 +239,33 @@ def _assemble_plaintext_dense(table: np.ndarray,
                               trim_ghosts: bool,
                               nx: int,
                               ny: int,
-                              nz: int) -> np.ndarray:
+                              nz: int) -> tuple[np.ndarray, np.ndarray]:
     if dim == 1:
         idx = table[:, 0].astype(int)
         vals = table[:, 1:1 + numvar]
+        contact = table[:, 1 + numvar]
 
         i_min = int(np.min(idx))
         i_max = int(np.max(idx))
         nx_all = i_max - i_min + 1
 
         out = np.full((numvar, 1, 1, nx_all), np.nan, dtype=float)
+        cw  = np.full((1, 1, nx_all), np.nan, dtype=float)
         for row_i, ii in enumerate(idx):
             out[:, 0, 0, ii - i_min] = vals[row_i, :]
+            cw[0, 0, ii - i_min] = contact[row_i]
 
         if trim_ghosts:
             s = max(0 - i_min, 0)
             out = out[:, :, :, s:s + nx]
+            cw  = cw[:, :, s:s + nx]
 
-        return out
+        return out, cw
 
     if dim == 2:
         ij = table[:, :2].astype(int)
         vals = table[:, 2:2 + numvar]
+        contact = table[:, 2 + numvar]
 
         i_min = int(np.min(ij[:, 0]))
         i_max = int(np.max(ij[:, 0]))
@@ -289,19 +276,23 @@ def _assemble_plaintext_dense(table: np.ndarray,
         ny_all = j_max - j_min + 1
 
         out = np.full((numvar, 1, ny_all, nx_all), np.nan, dtype=float)
+        cw  = np.full((1, ny_all, nx_all), np.nan, dtype=float)
         for row_i, (ii, jj) in enumerate(ij):
             out[:, 0, jj - j_min, ii - i_min] = vals[row_i, :]
+            cw[0, jj - j_min, ii - i_min] = contact[row_i]
 
         if trim_ghosts:
             si = max(0 - i_min, 0)
             sj = max(0 - j_min, 0)
             out = out[:, :, sj:sj + ny, si:si + nx]
+            cw  = cw[:, sj:sj + ny, si:si + nx]
 
-        return out
+        return out, cw
 
     if dim == 3:
         ijk = table[:, :3].astype(int)
         vals = table[:, 3:3 + numvar]
+        contact = table[:, 3 + numvar]
 
         i_min = int(np.min(ijk[:, 0]))
         i_max = int(np.max(ijk[:, 0]))
@@ -315,16 +306,19 @@ def _assemble_plaintext_dense(table: np.ndarray,
         nz_all = k_max - k_min + 1
 
         out = np.full((numvar, nz_all, ny_all, nx_all), np.nan, dtype=float)
+        cw  = np.full((nz_all, ny_all, nx_all), np.nan, dtype=float)
         for row_i, (ii, jj, kk) in enumerate(ijk):
             out[:, kk - k_min, jj - j_min, ii - i_min] = vals[row_i, :]
+            cw[kk - k_min, jj - j_min, ii - i_min] = contact[row_i]
 
         if trim_ghosts:
             si = max(0 - i_min, 0)
             sj = max(0 - j_min, 0)
             sk = max(0 - k_min, 0)
             out = out[:, sk:sk + nz, sj:sj + ny, si:si + nx]
+            cw  = cw[sk:sk + nz, sj:sj + ny, si:si + nx]
 
-        return out
+        return out, cw
 
     raise ValueError(f"Unsupported dimension {dim}")
 
@@ -346,7 +340,14 @@ def load_plaintext_snapshot(path: Path,
     ny = int(hdr["ny"]) if hdr["ny"] is not None else ctx.meta.ny
     nz = int(hdr["nz"]) if hdr["nz"] is not None else ctx.meta.nz
 
-    dense = _assemble_plaintext_dense(
+    expected_cols = dim + numvar + 1
+    if table.shape[1] < expected_cols:
+        raise ValueError(
+            f"Plaintext snapshot '{path}' does not contain contact_wave column. "
+            f"Expected at least {expected_cols} columns, got {table.shape[1]}."
+        )
+
+    dense, contact_wave = _assemble_plaintext_dense(
         table=table,
         dim=dim,
         numvar=numvar,
@@ -363,7 +364,9 @@ def load_plaintext_snapshot(path: Path,
         time=float(hdr["time"]) if hdr["time"] is not None else None,
         header=None,
         data=dense,
+        contact_wave=contact_wave,
     )
+
 
 def choose_snapshot_files(ctx: PlotContext,
                           step_start: Optional[int] = None,
@@ -414,6 +417,7 @@ def choose_snapshot_files(ctx: PlotContext,
 
     return paths
 
+
 def load_snapshot_sequence(ctx: PlotContext,
                            prefer_binary: bool = True,
                            trim_ghosts: Optional[bool] = None) -> list[LoadedSnapshot]:
@@ -443,9 +447,6 @@ def load_snapshot_sequence(ctx: PlotContext,
 
     return loaded
 
-# ============================================================
-# Unified loading
-# ============================================================
 
 def load_snapshot(ctx: PlotContext,
                   requested_step: Optional[int] = None,

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .config import PlotContext
-from .fields import get_var_field, nearest_index
+from .fields import get_var_field, get_contact_wave_field, nearest_index
 from .io import LoadedSnapshot
 
 
@@ -215,24 +215,49 @@ def animate_snapshots(ctx: PlotContext,
 
         x_vec, xlab = build_axis_1d(ctx, len(first))
 
-        ymin = min(np.nanmin(get_var_field(s, var)*0.9) for s in snapshots)
-        ymax = max(np.nanmax(get_var_field(s, var)*1.1 ) for s in snapshots)
+        ymin = min(np.nanmin(get_var_field(s, var) * 0.9) for s in snapshots)
+        ymax = max(np.nanmax(get_var_field(s, var) * 1.1) for s in snapshots)
 
         fig, ax = plt.subplots(figsize=(8, 4))
         (line,) = ax.plot(x_vec, first)
+
+        scatter = None
+        contact_y = ymax + 0.05 * max(ymax - ymin, 1.0)
+        if ctx.args.show_contact_wave:
+            scatter = ax.scatter([], [], color="red", s=18, zorder=5)
+            ax.set_ylim(ymin, ymax + 0.12 * max(ymax - ymin, 1.0))
+        else:
+            ax.set_ylim(ymin, ymax)
+
         ax.set_xlabel(xlab)
         ax.set_ylabel(f"v{var}")
-        ax.set_ylim(ymin, ymax)
 
         def update(frame_idx: int):
             snap = snapshots[frame_idx]
             field = get_var_field(snap, var)
             line.set_ydata(field)
+
+            artists = [line]
+
+            if scatter is not None:
+                contact = get_contact_wave_field(snap)
+                if contact is not None and contact.ndim == 1:
+                    mask = np.isfinite(contact) & (contact > 0.5)
+                    if np.any(mask):
+                        offsets = np.column_stack([
+                            x_vec[mask],
+                            np.full(np.count_nonzero(mask), contact_y),
+                        ])
+                    else:
+                        offsets = np.empty((0, 2))
+                    scatter.set_offsets(offsets)
+                artists.append(scatter)
+
             if snap.time is not None:
                 ax.set_title(f"step {snap.step}  t={snap.time:.6g}  v{var}")
             else:
                 ax.set_title(f"step {snap.step}  v{var}")
-            return (line,)
+            return tuple(artists)
 
         ani = animation.FuncAnimation(
             fig,

@@ -19,8 +19,8 @@
 
 # cmake -S . -B build-cuda-2D \
 #     -DCMAKE_BUILD_TYPE=Release \
-#     -DKokkos_ARCH_AMPERE86=OFF \
-#     -DKokkos_ARCH_ADA89=ON \
+#     -DKokkos_ARCH_AMPERE86=ONe \
+#     -DKokkos_ARCH_ADA89=OFF \
 #     -DKokkos_ENABLE_DEBUG=OFF \
 #     -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=OFF \
 #     -DKokkos_ENABLE_AGGRESSIVE_VECTORIZATION=ON \
@@ -34,10 +34,28 @@
 #     -DENABLE_OPENMP=ON \
 #     -DENABLE_CUDA=ON
 
-cmake -S . -B build-cuda-1D \
+# cmake -S . -B build-1D_transverse \
+#     -DCMAKE_BUILD_TYPE=Release \
+#     -DKokkos_ARCH_AMPERE86=ON \
+#     -DKokkos_ARCH_ADA89=OFF \
+#     -DKokkos_ENABLE_DEBUG=OFF \
+#     -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=OFF \
+#     -DKokkos_ENABLE_AGGRESSIVE_VECTORIZATION=ON \
+#     -DKokkos_ENABLE_OPENMP=ON \
+#     -DKokkos_ENABLE_CUDA=ON \
+#     -DKokkos_ENABLE_THREADS=OFF \
+#     -DKokkos_ENABLE_SERIAL=OFF \
+#     -DKokkos_ENABLE_CUDA_LAMBDA=ON \
+#     -DAETHER_DIM=1 \
+#     -DAETHER_PHYSICS=Euler \
+#     -DENABLE_OPENMP=ON \
+#     -DENABLE_CUDA=ON \
+#     -DAETHER_FORCE_DIM=2
+
+cmake -S . -B build-1D \
     -DCMAKE_BUILD_TYPE=Release \
-    -DKokkos_ARCH_AMPERE86=OFF \
-    -DKokkos_ARCH_ADA89=ON \
+    -DKokkos_ARCH_AMPERE86=ON \
+    -DKokkos_ARCH_ADA89=OFF \
     -DKokkos_ENABLE_DEBUG=OFF \
     -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=OFF \
     -DKokkos_ENABLE_AGGRESSIVE_VECTORIZATION=ON \
@@ -50,7 +68,6 @@ cmake -S . -B build-cuda-1D \
     -DAETHER_PHYSICS=Euler \
     -DENABLE_OPENMP=ON \
     -DENABLE_CUDA=ON \
-    -DAETHER_FORCE_DIM=2
 
 
 # cmake -S . -B build-OPENMP-1D \
@@ -99,4 +116,5 @@ cmake -S . -B build-cuda-1D \
 #     -DAETHER_DIM=1 \
 #     -DAETHER_PHYSICS=Euler \
 #     -DENABLE_OPENMP=ON \
-#     -DENABLE_CUDA=OFF
+#     -DENABLE_CUDA=OFF \
+#     -DAETHER_FORCE_DIM=2    

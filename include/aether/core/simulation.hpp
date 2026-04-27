@@ -61,6 +61,7 @@ struct SimulationD<1> {
     using CellView = typename policy_type::template CellView<double>;
     using DirView  = typename policy_type::template DirCellView<double>;
     using FaceView = typename policy_type::template FaceView<double>;
+    using BoolView = typename policy_type::template BoolView<double>;
 
     Config cfg{};
     TimeState time{};
@@ -77,6 +78,8 @@ struct SimulationD<1> {
     FaceView fxR{};
     FaceView fx{};
     bool ctu_enabled{false};
+    
+    BoolView contact_wave{};
 
     std::array<sweep_dir, 1> sweeps{ sweep_dir::x };
 
@@ -97,6 +100,8 @@ struct SimulationD<1> {
         FaceView fxL;
         FaceView fxR;
         FaceView fx;
+
+        BoolView contact_wave;
     };
 
     SimulationD() = default;
@@ -113,7 +118,8 @@ struct SimulationD<1> {
           fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          ctu_enabled(compute_ctu_enabled(config))
+          ctu_enabled(compute_ctu_enabled(config)),
+          contact_wave("contact wave", cells.Nz, cells.Ny, cells.Nx)
     {}
 
     [[nodiscard]] AETHER_INLINE
@@ -131,7 +137,8 @@ struct SimulationD<1> {
             chars,
             fxL,
             fxR,
-            fx
+            fx,
+            contact_wave
         };
     }
 

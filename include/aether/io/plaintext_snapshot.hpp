@@ -55,7 +55,7 @@ static AETHER_INLINE void write_plaintext_header(
 
 static AETHER_INLINE void write_plaintext_column_header(FILE* f) {
     std::fprintf(f,
-        "# Variable order: indices (i[,j[,k]]) then state variables v0..v%d\n",
+        "# Variable order: indices (i[,j[,k]]) then state variables v0..v%d plus contact_wave\n",
         aether::core::Simulation::numvar - 1);
 
     std::fprintf(f, "#");
@@ -70,12 +70,14 @@ static AETHER_INLINE void write_plaintext_column_header(FILE* f) {
     for (int v = 0; v < aether::core::Simulation::numvar; ++v) {
         std::fprintf(f, "  v%d", v);
     }
-    std::fprintf(f, "\n");
+
+    std::fprintf(f, "  contact_wave\n");
 }
 
-template<class HostView>
+template<class HostView, class ContactView>
 static AETHER_INLINE void write_plain_text_cell_line(FILE* f,
                                                      const HostView& prim_h,
+                                                     const ContactView& contact_h,
                                                      const aether::core::Simulation& sim,
                                                      int i, int j = 0, int k = 0) {
     const int ng = sim.grid.ng;
@@ -99,31 +101,36 @@ static AETHER_INLINE void write_plain_text_cell_line(FILE* f,
     for (int c = 0; c < aether::core::Simulation::numvar; ++c) {
         std::fprintf(f, "  %.16e", prim_h(c, kk, jj, ii));
     }
+
+    // NEW: contact_wave output
+    std::fprintf(f, "  %.16e", contact_h(kk, jj, ii));
+
     std::fprintf(f, "\n");
 }
 
-template<class HostView>
+template<class HostView, class ContactView>
 static AETHER_INLINE void dump_plaintext_prims_rows(FILE* f,
                                                     const HostView& prim_h,
+                                                    const ContactView& contact_h,
                                                     const aether::core::Simulation& sim,
                                                     bool include_ghosts) {
     const auto r = build_index_ranges(sim, include_ghosts);
 
     if constexpr (AETHER_DIM == 1) {
         for (int i = r.i0; i < r.i1; ++i) {
-            write_plain_text_cell_line(f, prim_h, sim, i);
+            write_plain_text_cell_line(f, prim_h, contact_h, sim, i);
         }
     } else if constexpr (AETHER_DIM == 2) {
         for (int j = r.j0; j < r.j1; ++j) {
             for (int i = r.i0; i < r.i1; ++i) {
-                write_plain_text_cell_line(f, prim_h, sim, i, j);
+                write_plain_text_cell_line(f, prim_h, contact_h, sim, i, j);
             }
         }
     } else {
         for (int k = r.k0; k < r.k1; ++k) {
             for (int j = r.j0; j < r.j1; ++j) {
                 for (int i = r.i0; i < r.i1; ++i) {
-                    write_plain_text_cell_line(f, prim_h, sim, i, j, k);
+                    write_plain_text_cell_line(f, prim_h, contact_h, sim, i, j, k);
                 }
             }
         }
@@ -141,11 +148,13 @@ static AETHER_INLINE void write_plaintext_snapshot(aether::core::Simulation& sim
     }
 
     auto prim_h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sim.view().prim);
+    auto contact_h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sim.view().contact_wave);
 
     write_plaintext_header(f, sim, req, path, r);
     write_plaintext_column_header(f);
-    dump_plaintext_prims_rows(f, prim_h, sim, req.include_ghosts);
+    dump_plaintext_prims_rows(f, prim_h, contact_h, sim, req.include_ghosts);
 
     std::fclose(f);
 }
+
 }

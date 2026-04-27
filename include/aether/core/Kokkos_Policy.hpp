@@ -77,6 +77,9 @@ struct Policy {
     template<class T = scalar_type>
     using FaceView = Kokkos::View<T*****, array_layout, device_type>;
 
+    template<class T = scalar_type>
+    using BoolView = Kokkos::View<T***, array_layout, device_type>;
+
     // Directional cell-centered bundle:
     //   A(dir,v,i,j,k), eigen(dir,v,i,j,k), characteristic(dir,v,i,j,k), etc.
     template<class T = scalar_type>

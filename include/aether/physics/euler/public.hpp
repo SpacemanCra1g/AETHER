@@ -7,6 +7,7 @@
 #include <aether/physics/euler/RiemannSolvers/hll.hpp>
 #include <aether/physics/euler/RiemannSolvers/hllc.hpp>
 #include <aether/physics/euler/RiemannSolvers/tc.hpp>
+#include <aether/physics/euler/linear_correction/linear_cor.hpp>
 
 namespace aether::physics::euler{
 

@@ -29,6 +29,7 @@ class PlotArgs:
     output: Optional[Path]
     title: Optional[str]
     contours: Optional[int]
+    show_contact_wave: bool
     slice_axis: Optional[str]
     slice_index: Optional[int]
     slice_value: Optional[float]
@@ -251,9 +252,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     ap.add_argument(
-    "--animate",
-    action="store_true",
-    help="Generate an animation over multiple snapshots instead of plotting a single snapshot.",
+        "--animate",
+        action="store_true",
+        help="Generate an animation over multiple snapshots instead of plotting a single snapshot.",
     )
 
     ap.add_argument(
@@ -285,9 +286,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     ap.add_argument(
-    "--cell-axis",
-    action="store_true",
-    help="Plot using cell index on the x-axis instead of physical coordinates.",
+        "--cell-axis",
+        action="store_true",
+        help="Plot using cell index on the x-axis instead of physical coordinates.",
     )
 
     ap.add_argument(
@@ -326,6 +327,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--output", type=str, default=None, help="Optional output image path.")
     ap.add_argument("--title", type=str, default=None, help="Optional plot title.")
     ap.add_argument("--contours", type=int, default=None, help="Overlay contour lines with N levels.")
+    ap.add_argument(
+        "--show-contact-wave",
+        action="store_true",
+        help="Overlay red markers for cells with contact_wave > 0.5 (plaintext snapshots only).",
+    )
 
     ap.add_argument("--slice-axis", choices=["x", "y", "z"], default=None)
     ap.add_argument("--slice-index", type=int, default=None)
@@ -371,6 +377,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> PlotArgs:
         output=output,
         title=ns.title,
         contours=ns.contours,
+        show_contact_wave=ns.show_contact_wave,
         slice_axis=ns.slice_axis,
         slice_index=ns.slice_index,
         slice_value=ns.slice_value,

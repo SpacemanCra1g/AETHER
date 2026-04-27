@@ -1,3 +1,4 @@
+#include "aether/physics/euler/linear_correction/linear_cor.hpp"
 #include <Kokkos_Core.hpp>
 #include <aether/core/Initialize.hpp>
 #include <aether/core/RunParams_io.hpp>
@@ -44,7 +45,14 @@ int main() {
 
         // Populate conservative variables and perform boundary conditions
         aether::phys::prims_to_cons_domain(sim);
-        boundary_conditions(sim,domain.cons);        
+        boundary_conditions(sim,domain.cons);  
+        
+        auto p_copy = Kokkos::View<double****>("prim0"
+            , domain.prim.extent(0)
+            , domain.prim.extent(1)
+            , domain.prim.extent(2)            
+            , domain.prim.extent(3)            
+        );
 
         // Solve loop
         do {
@@ -52,8 +60,17 @@ int main() {
             sim.time.step++;
             std::cout << "The time step is " << sim.time.dt
                       << " The current time is " << sim.time.t << "\n";
+
+            // Deep copy of the prims array 
+            Kokkos::deep_copy(p_copy,domain.prim);
             Time_stepper(sim);
             boundary_conditions(sim, domain.cons);
+
+            // Try the linear correction for the contact wave problem
+            Kokkos::deep_copy(domain.prim,p_copy);
+            #if AETHER_DIM_FORCING == 2
+            correct_domain(sim);
+            #endif
             aether::phys::cons_to_prims_domain(sim);
 
             if (sim.cfg.snap_shot_interval > 0 && sim.time.step % sim.cfg.snap_shot_interval == 0){
