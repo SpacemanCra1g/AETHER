@@ -6,22 +6,26 @@ snapshot_prefix = snap
 snapshot_text_extension = .dat
 snapshot_binary_extension = .bin
 
-dimension = 1
-numvar = 3
+dimension = 2
+numvar = 4
 scalar_type = double
 payload_kind = primitive
 file_order_binary = (var,k,j,i)
 file_order_text = row-major with explicit indices
 include_ghosts_default = true
-output_plain_txt = false
-output_binary = true
+output_plain_txt = true
+output_binary = false
 
-nx = 1000
-ng = 4
+nx = 128
+ny = 128
+ng = 3
 
 x_min = 0.0000000000000000e+00
 x_max = 1.0000000000000000e+00
+y_min = 0.0000000000000000e+00
+y_max = 1.0000000000000000e+00
 
-dx = 1.0000000000000000e-03
+dx = 7.8125000000000000e-03
+dy = 7.8125000000000000e-03
 gamma = 1.3999999999999999e+00
 quad = 1

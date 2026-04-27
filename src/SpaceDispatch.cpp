@@ -504,11 +504,17 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fzR(c, q, k,   j, i) = p_vec_L[c];
                         view.fzL(c, q, k+1, j, i) = p_vec_R[c];
-// ---------- Basic r=3 GP functionality ----------
+                    }
+                }
+            }
+        }
+    );
+}
+
 AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
     constexpr int numvar = aether::phys_ct::numvar;
     const int radius = sim.cfg.gp_radius;
-    const int gp_input_size = sim.cfg.gp_input_size();
+    const int input_size = sim.cfg.gp_input_size();
     const int stencil_size = 2 * radius + 1;
     
     auto view = sim.view();
@@ -516,11 +522,11 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
     
     // Loop over interior cells (excluding ghost cells)
     Kokkos::parallel_for(
-        "FOG_sweep",
-        loop::cells_full(sim),
+        "GP_sweep",
+        loop::cells_interior(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
 
-            double stencil[numvar][gp_input_size];
+            double stencil[numvar][input_size];
             
             for (int c = 0; c < numvar; ++c) {
                 for (int di = -radius; di <= radius; ++di) {
@@ -535,33 +541,33 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
             double stencil_mean[numvar];
             for (int c = 0; c < numvar; ++c) {
                 stencil_mean[c] = 0.0;
-                for (int k = 0; k < gp_input_size; ++k) {
+                for (int k = 0; k < input_size; ++k) {
                     stencil_mean[c] += stencil[c][k];
                 }
-                stencil_mean[c] /= (gp_input_size);
+                stencil_mean[c] /= (input_size);
             }
             
             // Subtract mean from stencil values to get deviations
-            double stencil_dev[numvar][gp_input_size];
+            double stencil_dev[numvar][input_size];
             for (int c = 0; c < numvar; ++c) {
-                for (int k = 0; k < gp_input_size; ++k) {
+                for (int k = 0; k < input_size; ++k) {
                     stencil_dev[c][k] = stencil[c][k] - stencil_mean[c];
                 }
             }
             
             // Compute alpha = K^-1 @ stencil using Cholesky factorization
             // where gp_L_mat contains L such that K = L*L^T
-            double alpha[numvar][gp_input_size];
+            double alpha[numvar][input_size];
             for (int c = 0; c < numvar; ++c) {
-                for (int k = 0; k < gp_input_size; ++k) {
+                for (int k = 0; k < input_size; ++k) {
                     alpha[c][k] = 0.0;
                 }
             }
             
             for (int c = 0; c < numvar; ++c) {
                 // First, solve L*y = stencil_dev for y (forward substitution)
-                double y[gp_input_size];
-                for (int k = 0; k < gp_input_size; ++k) {
+                double y[input_size];
+                for (int k = 0; k < input_size; ++k) {
                     double sum = stencil_dev[c][k];
                     for (int m = 0; m < k; ++m) {
                         sum -= view.gp_L_mat(k, m) * y[m];
@@ -570,23 +576,23 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                 }
                 
                 // Then, solve L^T*alpha = y for alpha (backward substitution)
-                for (int k = gp_input_size - 1; k >= 0; --k) {
+                for (int k = input_size - 1; k >= 0; --k) {
                     double sum = y[k];
-                    for (int m = k + 1; m < gp_input_size; ++m) {
+                    for (int m = k + 1; m < input_size; ++m) {
                         sum -= view.gp_L_mat(m, k) * alpha[c][m];
                     }
                     alpha[c][k] = sum / view.gp_L_mat(k, k);
                 }
             }
             // for (int c = 0; c < numvar; ++c) {
-            //     for (int k = 0; k < gp_input_size; ++k) {
+            //     for (int k = 0; k < input_size; ++k) {
             //         printf("alpha[%d][%d] = %f\n", c, k, alpha[c][k]);
             //     }
             // }   
             
             // Compute Marginal Log Likelihood (MLL) for each component
             double mll;
-            const int n = gp_input_size;
+            const int n = input_size;
             const double log_2pi = 1.8378770664093453; // log(2*pi)
             bool use_fallback = false;
             
@@ -632,8 +638,8 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fxL(c, q, 0, j, i) = pred_l + stencil_mean[c];
                         view.fxR(c, q, 0, j, i+1) = pred_r + stencil_mean[c];
-                        view.fyR(c, q, 0, j, i) = pred_d + stencil_mean[c];
-                        view.fyL(c, q, 0, j+1, i) = pred_u + stencil_mean[c];
+                        view.fyL(c, q, 0, j, i) = pred_d + stencil_mean[c];
+                        view.fyR(c, q, 0, j+1, i) = pred_u + stencil_mean[c];
                     }
                 }
             }

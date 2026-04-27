@@ -54,7 +54,7 @@ int main() {
         do {
             aether::phys::set_dt(sim);
             sim.time.step++;
-            std::cout << "The time step is " << sim.time.dt
+            std::cout << "The time step is " << sim.time.step << " with dt = " << sim.time.dt
                       << " The current time is " << sim.time.t << "\n";
             Time_stepper(sim);
             boundary_conditions(sim, domain.cons);

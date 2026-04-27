@@ -502,6 +502,10 @@ void check_run_parameters(Config& cfg) {
             throw std::runtime_error("Config error: solver::ppm requires at least 4 ghost cells for 2D CTU");
           }
         }
+    } else if (cfg.solve == solver::gp) {
+        if (cfg.num_ghost < cfg.gp_radius) {
+            throw std::runtime_error("Config error: solver::gp requires num_ghost >= gp_radius.");
+        }
     } else {throw std::runtime_error("Config error: ghost requirements not specified for this solver");}
 
 }

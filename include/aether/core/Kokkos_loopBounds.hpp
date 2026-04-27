@@ -29,6 +29,8 @@ auto riemann_sweep_policy(const Sim& sim){
         halo = sim.cells.ng - 2;
     } else if (sim.cfg.solve==aether::core::solver::ppm){
         halo = sim.cells.ng - 3;
+    } else if (sim.cfg.solve==aether::core::solver::gp){
+        halo = sim.cells.ng;
     } else {
         throw std::runtime_error("This Space solver does not have a riemann loop policy");
     }
@@ -65,6 +67,8 @@ auto solver_sweep_policy(const Sim& sim){
         halo = sim.cells.ng - 1;
     } else if (sim.cfg.solve==aether::core::solver::ppm){
         halo = sim.cells.ng - 2;
+    } else if (sim.cfg.solve==aether::core::solver::gp){
+        halo = sim.cells.ng;
     } else {
         throw std::runtime_error("This Space solver does not have a loop policy");
     }
