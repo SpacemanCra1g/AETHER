@@ -9,6 +9,8 @@
 #include <aether/core/char_struct.hpp>
 #include <aether/core/prim_layout.hpp>
 #include <aether/core/slope_limiters.hpp>
+#include <KokkosBatched_Trsv_Decl.hpp>
+#include <KokkosBatched_Trsv_Serial_Impl.hpp>
 
 using chars = aether::core::one_cell_spectral_container;
 using vec   = aether::math::Vec<aether::phys_ct::numvar>;
@@ -519,6 +521,21 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
     
     auto view = sim.view();
     auto prim = view.prim;
+
+    // Define these BEFORE the Kokkos::parallel_for call
+    using ForwardSolve = KokkosBatched::SerialTrsv<
+        KokkosBatched::Uplo::Lower,
+        KokkosBatched::Trans::NoTranspose,
+        KokkosBatched::Diag::NonUnit,
+        KokkosBatched::Algo::Trsv::Unblocked
+    >;
+
+    using BackwardSolve = KokkosBatched::SerialTrsv<
+        KokkosBatched::Uplo::Lower,
+        KokkosBatched::Trans::Transpose,
+        KokkosBatched::Diag::NonUnit,
+        KokkosBatched::Algo::Trsv::Unblocked
+    >;
     
     // Loop over interior cells (excluding ghost cells)
     Kokkos::parallel_for(
@@ -564,31 +581,26 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                 }
             }
             
+            // KokkosKernels expects Kokkos::Views, so wrap our stack arrays
+            // gp_L_mat is already a view; we need subviews for y and alpha per component
+
+            using ScratchSpace = Kokkos::DefaultExecutionSpace::scratch_memory_space;
+            using unmanaged_vec = Kokkos::View<double*, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+
             for (int c = 0; c < numvar; ++c) {
-                // First, solve L*y = stencil_dev for y (forward substitution)
-                double y[input_size];
-                for (int k = 0; k < input_size; ++k) {
-                    double sum = stencil_dev[c][k];
-                    for (int m = 0; m < k; ++m) {
-                        sum -= view.gp_L_mat(k, m) * y[m];
-                    }
-                    y[k] = sum / view.gp_L_mat(k, k);
-                }
-                
-                // Then, solve L^T*alpha = y for alpha (backward substitution)
-                for (int k = input_size - 1; k >= 0; --k) {
-                    double sum = y[k];
-                    for (int m = k + 1; m < input_size; ++m) {
-                        sum -= view.gp_L_mat(m, k) * alpha[c][m];
-                    }
-                    alpha[c][k] = sum / view.gp_L_mat(k, k);
-                }
+                // Wrap stencil_dev row and alpha row as unmanaged views
+                unmanaged_vec rhs(stencil_dev[c], input_size);
+                unmanaged_vec sol(alpha[c],       input_size);
+
+                // Copy rhs into sol — Trsv solves in-place
+                for (int n = 0; n < input_size; ++n) sol(n) = rhs(n);
+
+                ForwardSolve::invoke(1.0, view.gp_L_mat, sol);
+                BackwardSolve::invoke(1.0, view.gp_L_mat, sol);
+
+                // sol now contains alpha[c]
+                for (int n = 0; n < input_size; ++n) alpha[c][n] = sol(n);
             }
-            // for (int c = 0; c < numvar; ++c) {
-            //     for (int k = 0; k < input_size; ++k) {
-            //         printf("alpha[%d][%d] = %f\n", c, k, alpha[c][k]);
-            //     }
-            // }   
             
             // Compute Marginal Log Likelihood (MLL) for each component
             double mll;
@@ -600,7 +612,7 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                 // Compute y^T * alpha
                 double y_dot_alpha = 0.0;
                 for (int k = 0; k < n; ++k) {
-                    y_dot_alpha += stencil[c][k] * alpha[c][k];
+                    y_dot_alpha += stencil_dev[c][k] * alpha[c][k];
                 }
                 
                 // Compute log(det(K)) = 2 * sum(log(diag(L)))
@@ -611,7 +623,7 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                 
                 // MLL = -0.5 * (y^T*alpha + log(det(K)) + n*log(2*pi))
                 mll = -0.5 * (y_dot_alpha + log_det_K + n * log_2pi);
-                if (mll <= 0.0) {
+                if (mll <= sim.cfg.gp_fallback_threshold) {
                     use_fallback = true;
                     break;
                 }
@@ -620,7 +632,7 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
             // Set the fallback mask for this cell
             // view.gp_fallback_mask(j - ng, i - ng) = use_fallback;
 
-            if (!use_fallback || false) {
+            if (!use_fallback) {
                 // Use GP predictions when MLL indicates good model quality
                 for (int c = 0; c < numvar; ++c) {
                     double pred_l = 0.0;
@@ -636,10 +648,10 @@ AETHER_INLINE void gp_2d(Simulation& sim) noexcept {
                     }
 
                     for (int q = 0; q < view.quad; ++q) {
-                        view.fxL(c, q, 0, j, i) = pred_l + stencil_mean[c];
-                        view.fxR(c, q, 0, j, i+1) = pred_r + stencil_mean[c];
-                        view.fyL(c, q, 0, j, i) = pred_d + stencil_mean[c];
-                        view.fyR(c, q, 0, j+1, i) = pred_u + stencil_mean[c];
+                        view.fxR(c, q, 0, j, i)   = pred_l + stencil_mean[c]; // cell i's left face  (right-biased from i-1, left-biased from i)
+                        view.fxL(c, q, 0, j, i+1) = pred_r + stencil_mean[c]; // cell i's right face (right-biased from i, left-biased from i+1)
+                        view.fyR(c, q, 0, j, i)   = pred_d + stencil_mean[c]; // cell j's bottom face
+                        view.fyL(c, q, 0, j+1, i) = pred_u + stencil_mean[c]; // cell j's top face
                     }
                 }
             }

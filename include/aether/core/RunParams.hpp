@@ -14,6 +14,7 @@ namespace aether::core {
         int num_ghost{0};
         int num_quad{0};
         int gp_radius{3};
+        double gp_fallback_threshold{10.0};
         test_problem prob;
         riemann riem = riemann::hll;
         solver solve = solver::fog;

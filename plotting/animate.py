@@ -251,32 +251,93 @@ def animate_snapshots(ctx: PlotContext,
         x_edges = axis_edges_from_centers(x_vec)
         y_edges = axis_edges_from_centers(y_vec)
 
-        vmin = min(np.nanmin(get_var_field(s, var)) for s in snapshots)
-        vmax = max(np.nanmax(get_var_field(s, var)) for s in snapshots)
+        # Handle slice_axis for 2D animation (1D line plots over time)
+        if ctx.args.slice_axis is not None:
+            if ctx.args.slice_axis == "z":
+                raise ValueError("2D data has no z axis.")
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        pcm = ax.pcolormesh(x_edges, y_edges, first, shading="auto", vmin=vmin, vmax=vmax)
-        fig.colorbar(pcm, ax=ax, label=f"v{var}")
-        ax.set_xlabel(xlab)
-        ax.set_ylabel(ylab)
+            if ctx.args.slice_axis == "x":
+                if ctx.args.slice_value is not None:
+                    j0 = nearest_index(y_vec, ctx.args.slice_value)
+                else:
+                    j0 = ctx.args.slice_index if ctx.args.slice_index is not None else (first.shape[0] // 2)
+                j0 = max(0, min(first.shape[0] - 1, j0))
+                slice_idx = j0
+                slice_axis = "y"
+                slice_coord = y_vec[j0]
+            else:  # slice_axis == "y"
+                if ctx.args.slice_value is not None:
+                    i0 = nearest_index(x_vec, ctx.args.slice_value)
+                else:
+                    i0 = ctx.args.slice_index if ctx.args.slice_index is not None else (first.shape[1] // 2)
+                i0 = max(0, min(first.shape[1] - 1, i0))
+                slice_idx = i0
+                slice_axis = "x"
+                slice_coord = x_vec[i0]
 
-        def update(frame_idx: int):
-            snap = snapshots[frame_idx]
-            field = get_var_field(snap, var)
-            pcm.set_array(field.ravel())
-            if snap.time is not None:
-                ax.set_title(f"step {snap.step}  t={snap.time:.6g}  v{var}")
+            # Get 1D slices from all snapshots
+            slices = []
+            if ctx.args.slice_axis == "x":
+                for s in snapshots:
+                    field = get_var_field(s, var)
+                    slices.append(field[slice_idx, :])
             else:
-                ax.set_title(f"step {snap.step}  v{var}")
-            return (pcm,)
+                for s in snapshots:
+                    field = get_var_field(s, var)
+                    slices.append(field[:, slice_idx])
 
-        ani = animation.FuncAnimation(
-            fig,
-            update,
-            frames=len(snapshots),
-            interval=interval_ms,
-            blit=False,
-        )
+            ymin = min(np.nanmin(s) * 0.9 for s in slices)
+            ymax = max(np.nanmax(s) * 1.1 for s in slices)
+
+            fig, ax = plt.subplots(figsize=(8, 4))
+            (line,) = ax.plot(x_vec if ctx.args.slice_axis == "x" else y_vec, slices[0])
+            ax.set_xlabel(xlab if ctx.args.slice_axis == "x" else ylab)
+            ax.set_ylabel(f"v{var}")
+            ax.set_ylim(ymin, ymax)
+
+            def update(frame_idx: int):
+                snap = snapshots[frame_idx]
+                line.set_ydata(slices[frame_idx])
+                if snap.time is not None:
+                    ax.set_title(f"step {snap.step}  t={snap.time:.6g}  v{var} slice at {slice_axis}={slice_coord:.6g}")
+                else:
+                    ax.set_title(f"step {snap.step}  v{var} slice at {slice_axis}={slice_coord:.6g}")
+                return (line,)
+
+            ani = animation.FuncAnimation(
+                fig,
+                update,
+                frames=len(snapshots),
+                interval=interval_ms,
+                blit=False,
+            )
+        else:
+            vmin = min(np.nanmin(get_var_field(s, var)) for s in snapshots)
+            vmax = max(np.nanmax(get_var_field(s, var)) for s in snapshots)
+
+            fig, ax = plt.subplots(figsize=(8, 6))
+            pcm = ax.pcolormesh(x_edges, y_edges, first, shading="auto", vmin=vmin, vmax=vmax)
+            fig.colorbar(pcm, ax=ax, label=f"v{var}")
+            ax.set_xlabel(xlab)
+            ax.set_ylabel(ylab)
+
+            def update(frame_idx: int):
+                snap = snapshots[frame_idx]
+                field = get_var_field(snap, var)
+                pcm.set_array(field.ravel())
+                if snap.time is not None:
+                    ax.set_title(f"step {snap.step}  t={snap.time:.6g}  v{var}")
+                else:
+                    ax.set_title(f"step {snap.step}  v{var}")
+                return (pcm,)
+
+            ani = animation.FuncAnimation(
+                fig,
+                update,
+                frames=len(snapshots),
+                interval=interval_ms,
+                blit=False,
+            )
 
     elif dim == 3:
         first = get_var_field(snapshots[0], var)

@@ -207,6 +207,10 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     cfg.gp_radius = std::stoi(s.substr(9,s.length()-9));
     return true;
   }
+  else if (s.substr(0,21) == "gp_fallback_threshold"){
+    cfg.gp_fallback_threshold = std::stod(s.substr(21,s.length()-21));
+    return true;
+  }
   else if (s.substr(0,12) == "test_problem"){
     std::string test_prob = s.substr(12, s.length() - 12); 
     std::string test_prob_lower;

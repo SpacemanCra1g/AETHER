@@ -9,6 +9,7 @@
 #include <aether/core/enums.hpp>
 #include <aether/physics/counts.hpp>
 
+
 namespace aether::core {
 
 template<int DIM>
@@ -19,7 +20,7 @@ struct SimulationD;
 // ============================================================
 
 static AETHER_INLINE bool compute_ctu_enabled(const Config& c) noexcept {
-    return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm || c.solve == solver::ppm);
+    return AETHER_DIM > 1 && (c.solve == solver::fog || c.solve == solver::plm || c.solve == solver::ppm || c.solve == solver::gp);
 }
 
 struct TimeState {
@@ -271,8 +272,8 @@ struct SimulationD<2> {
           gp_k_star_r("gp_k_star_r", cfg.gp_input_size()),
           gp_k_star_u("gp_k_star_u", cfg.gp_input_size()),
           gp_k_star_d("gp_k_star_d", cfg.gp_input_size())
-    {
-        init_gp_matrices(config);
+    {   
+        if (cfg.solve == solver::gp) init_gp_matrices(config);
     }
 
     [[nodiscard]] AETHER_INLINE

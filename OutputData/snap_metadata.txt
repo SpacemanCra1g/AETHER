@@ -18,7 +18,7 @@ output_binary = false
 
 nx = 128
 ny = 128
-ng = 3
+ng = 2
 
 x_min = 0.0000000000000000e+00
 x_max = 1.0000000000000000e+00

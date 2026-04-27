@@ -137,6 +137,19 @@ set(Kokkos_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
 # ---- Kokkos submodule --------------------------------------------------------
 add_subdirectory(${CMAKE_SOURCE_DIR}/tpls/kokkos)
 
+# ---- KokkosKernels submodule ------------------------------------------------
+set(KokkosKernels_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(KokkosKernels_ENABLE_TESTS    OFF CACHE BOOL "" FORCE)
+set(KokkosKernels_ENABLE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+
+# Only enable the components you actually need
+set(KokkosKernels_ENABLE_ALL_COMPONENTS OFF CACHE BOOL "" FORCE)
+set(KokkosKernels_ENABLE_COMPONENT_BLAS     ON CACHE BOOL "" FORCE)
+set(KokkosKernels_ENABLE_COMPONENT_BATCHED  ON CACHE BOOL "" FORCE)
+set(KokkosKernels_ENABLE_COMPONENT_LAPACK   ON CACHE BOOL "" FORCE)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/tpls/kokkos-kernels)
+
 # ---- Generate build-dir header ----------------------------------------------
 configure_file(
   ${CMAKE_SOURCE_DIR}/include/aether/core/config_build.hpp.in.cmake
@@ -223,6 +236,7 @@ target_link_libraries(aether_core
     aether_compile_options
   PUBLIC
     Kokkos::kokkos
+    Kokkos::kokkoskernels
 )
 
 target_compile_options(aether_core PRIVATE
