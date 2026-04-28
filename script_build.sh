@@ -36,8 +36,8 @@
 
 # cmake -S . -B build-1D_transverse \
 #     -DCMAKE_BUILD_TYPE=Release \
-#     -DKokkos_ARCH_AMPERE86=ON \
-#     -DKokkos_ARCH_ADA89=OFF \
+#     -DKokkos_ARCH_AMPERE86=OFF \
+#     -DKokkos_ARCH_ADA89=ON \
 #     -DKokkos_ENABLE_DEBUG=OFF \
 #     -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=OFF \
 #     -DKokkos_ENABLE_AGGRESSIVE_VECTORIZATION=ON \
@@ -54,8 +54,8 @@
 
 cmake -S . -B build-1D \
     -DCMAKE_BUILD_TYPE=Release \
-    -DKokkos_ARCH_AMPERE86=ON \
-    -DKokkos_ARCH_ADA89=OFF \
+    -DKokkos_ARCH_AMPERE86=OFF \
+    -DKokkos_ARCH_ADA89=ON \
     -DKokkos_ENABLE_DEBUG=OFF \
     -DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=OFF \
     -DKokkos_ENABLE_AGGRESSIVE_VECTORIZATION=ON \

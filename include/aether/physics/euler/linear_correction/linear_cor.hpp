@@ -9,9 +9,9 @@
 
 namespace aether::physics::euler {
 
-static constexpr bool APPLY_LINEAR_CORRECTION_EVERYWHERE = false;
-static constexpr double CONTACT_TOL_P  = 1.0e-4;
-static constexpr double CONTACT_TOL_VX = 1.0e-4;
+static constexpr bool APPLY_LINEAR_CORRECTION_EVERYWHERE = true;
+static constexpr double CONTACT_TOL_P  = 1.0e-8;
+static constexpr double CONTACT_TOL_VX = 1.0e-8;
 static constexpr double DELTA_E_TRIGGER = 1.0e-5;
 
 KOKKOS_INLINE_FUNCTION
@@ -63,13 +63,13 @@ cons linear_correction_impl(
 ) noexcept {
     cons C_out = C_in;
 
-    constexpr int    MAX_ITER  = 12;
+    constexpr int    MAX_ITER  = 20;
     constexpr double TOL_P     = 1.0e-12;
     constexpr double TOL_VX    = 1.0e-12;
     constexpr double NU        = 1.0e-8;
     constexpr double DET_TOL   = 1.0e-15;
     constexpr double EPS       = 1.0e-14;
-    constexpr double OMEGA_MIN = 1.0e-6;
+    constexpr double OMEGA_MIN = 1.0e-8;
 
     auto cons_to_prims_euler =
         [&](const cons& C, prims& P) noexcept -> bool {
@@ -221,7 +221,7 @@ cons linear_correction(const cons&  C_in,
 
     auto p_new = cons_to_prims_cell(C_in,sim.gamma);
 
-    if (p_new.rho > fmax( PL.p, fmax(PR.p,Pc.p) ) ){
+    if ( (p_new.p - fmax( PL.p, fmax(PR.p,Pc.p) )) > 1.e-7 ){
         
         sim.contact_wave(k,j,i) = 1.0;
         return linear_correction_impl(C_in, Pc, gamma);

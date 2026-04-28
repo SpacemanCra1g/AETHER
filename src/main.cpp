@@ -1,3 +1,4 @@
+#include "aether/core/prim_layout.hpp"
 #include "aether/physics/euler/linear_correction/linear_cor.hpp"
 #include <Kokkos_Core.hpp>
 #include <aether/core/Initialize.hpp>
@@ -68,9 +69,9 @@ int main() {
 
             // Try the linear correction for the contact wave problem
             Kokkos::deep_copy(domain.prim,p_copy);
-            #if AETHER_DIM_FORCING == 2
-            correct_domain(sim);
-            #endif
+            if constexpr (aether::prim::Prim::HAS_VY) {
+                correct_domain(sim);
+            }
             aether::phys::cons_to_prims_domain(sim);
 
             if (sim.cfg.snap_shot_interval > 0 && sim.time.step % sim.cfg.snap_shot_interval == 0){

@@ -16,12 +16,12 @@ include_ghosts_default = true
 output_plain_txt = true
 output_binary = false
 
-nx = 200
+nx = 600
 ng = 4
 
 x_min = 0.0000000000000000e+00
 x_max = 1.0000000000000000e+00
 
-dx = 5.0000000000000001e-03
+dx = 1.6666666666666668e-03
 gamma = 1.3999999999999999e+00
 quad = 1
