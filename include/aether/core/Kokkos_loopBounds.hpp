@@ -105,7 +105,6 @@ auto cells_halo3(const Sim& sim) {
     );
 }
 
-
 template<class Sim>
 auto cells_halo2(const Sim& sim) {
     using exec_space = exec_space_t<Sim>;

@@ -45,7 +45,6 @@ static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
 template<class Sim>
 void flux_diff_sweep(CellView out, Sim& sim) noexcept {
     constexpr int numvar = aether::phys_ct::numvar;
-
     auto view = sim.view();
 
     flux_sweep<numvar, sweep_dir::x>(out, view.fx, sim);

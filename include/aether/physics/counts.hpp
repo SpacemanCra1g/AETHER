@@ -32,4 +32,6 @@ inline constexpr int dim = AETHER_DIM;
 #error "Unknown AETHER_PHYSICS_KIND"
     inline constexpr int numvar = 0;
 #endif
+
+inline constexpr int numvar_prim_full = numvar + 1;
 }

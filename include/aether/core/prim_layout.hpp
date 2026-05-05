@@ -4,6 +4,7 @@
 
 namespace aether::prim {
 constexpr int numvar = aether::phys_ct::numvar;
+constexpr int numvar_prim_full = aether::phys_ct::numvar_prim_full;
 // Physics kind codes must match config_build.hpp: 1=Euler, 2=SRHD, 3=MHD
 template<int DIM, int PHYS> struct Layout;
 
@@ -23,7 +24,8 @@ struct Layout<DIM, 1> {
   static constexpr int VZ = HAS_VZ ? (HAS_VY ? 3 : 2) : -1;
 
   static constexpr int P  = HAS_VZ ? 4 : (HAS_VY ? 3 : 2);
-  static constexpr int COUNT = P + 1;
+  static constexpr int EINT  = P + 1;
+  static constexpr int COUNT = EINT;
 };
 
 // ---------- SRHD ----------
@@ -36,7 +38,8 @@ struct Layout<DIM, 2> {
   static constexpr int VY  = 2;
   static constexpr int VZ  = 3;
   static constexpr int P   = 4;
-  static constexpr int COUNT = 5;
+  static constexpr int EINT  = P + 1;
+  static constexpr int COUNT = EINT + 1;
 
   static constexpr bool HAS_VY = true;
   static constexpr bool HAS_VZ = true;
