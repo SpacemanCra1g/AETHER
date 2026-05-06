@@ -38,7 +38,9 @@ int main() {
 
         //  load initial conditions and prepare for run 
         initialize_domain(sim);
-        auto domain = sim.view();        
+        auto domain = sim.view();     
+        
+        Initialize_internal_energy(domain.prim, sim);
 
         // Write time = 0 
         aether::io::write_snapshot(sim, snap);
@@ -61,7 +63,7 @@ int main() {
                 aether::io::write_snapshot(sim, snap);
             }
 
-        } while (sim.time.t < sim.time.t_end ); 
+        } while (sim.time.t < sim.time.t_end && false); 
 
         std::cout << "The final time is " << sim.time.t << "\n";
         aether::io::write_snapshot(sim, snap);

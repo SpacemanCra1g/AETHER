@@ -159,6 +159,15 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                     Flux(VelMap<dir>::VT2, q, k, j, i) = F.vz;
                 }
                 Flux(P::P, q, k, j, i) = F.p;
+
+                // Calculate and store the internal_energy flux 
+                double F1 = F.rho * ((F.rho >= 0.0) 
+                                        ? FL(P::EINT, q, k, j, i) / L.rho
+                                        : FR(P::EINT, q, k, j, i) / R.rho);
+                double F2 = F.rho * ((F.rho >= 0.0) ? 1.0 / L.rho : 1.0 / R.rho);
+                double pbar = 0.5 * (L.p + R.p);
+
+                Flux(P::EINT,q,k,j,i) = F1 + pbar * F2;
             }
         }
     );

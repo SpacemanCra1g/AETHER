@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Kokkos_Core.hpp>
-
 #include <aether/physics/counts.hpp>
 #include <aether/core/simulation.hpp>
 #include <aether/core/enums.hpp>
@@ -44,7 +43,7 @@ static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
 
 template<class Sim>
 void flux_diff_sweep(CellView out, Sim& sim) noexcept {
-    constexpr int numvar = aether::phys_ct::numvar;
+    constexpr int numvar = aether::phys_ct::numvar_prim_full;
     auto view = sim.view();
 
     flux_sweep<numvar, sweep_dir::x>(out, view.fx, sim);
