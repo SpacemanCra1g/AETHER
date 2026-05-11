@@ -16,8 +16,8 @@ void Time_stepper(Simulation& sim){
             Space_solve(sim);
             if (sim.ctu_enabled) CTU_correction(sim);
             Riemann_dispatch(sim, domain);
-            flux_diff_sweep(domain.prim, sim);
-            axpy(domain.cons, -1.0, domain.prim);
+            flux_diff_sweep(domain.flux_diff, sim);
+            axpy(sim, -1.0, domain.flux_diff);
             Update_internal_energy(domain.cons, domain.prim,sim);
             break;
         
@@ -25,8 +25,8 @@ void Time_stepper(Simulation& sim){
             Space_solve(sim);
             if (sim.ctu_enabled) CTU_correction(sim);
             Riemann_dispatch(sim, domain);
-            flux_diff_sweep(domain.prim, sim);
-            axpy(domain.cons, -1.0, domain.prim);
+            flux_diff_sweep(domain.flux_diff, sim);
+            axpy(sim, -1.0, domain.flux_diff);
             Update_internal_energy(domain.cons, domain.prim,sim);
             break;
 

@@ -46,7 +46,7 @@ static AETHER_INLINE std::size_t cells_per_var(const index_ranges& r) {
 }
 
 static AETHER_INLINE std::size_t payload_bytes(const index_ranges& r) {
-    return static_cast<std::size_t>(aether::core::Simulation::numvar)
+    return static_cast<std::size_t>(aether::core::Simulation::numvar_full)
          * cells_per_var(r)
          * snapshot_scalar_bytes();
 }
@@ -147,7 +147,7 @@ build_binary_tasks(const aether::core::Simulation& sim,
                    const snapshot_request& req) {
     const index_ranges r = build_index_ranges(sim, req.include_ghosts);
 
-    const int nvar = aether::core::Simulation::numvar;
+    const int nvar = aether::core::Simulation::numvar_full;
     const int nx   = static_cast<int>(effective_nx(r));
     const int ny   = static_cast<int>(effective_ny(r));
     const int nz   = static_cast<int>(effective_nz(r));

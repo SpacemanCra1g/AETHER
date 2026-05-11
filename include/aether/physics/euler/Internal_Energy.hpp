@@ -30,7 +30,8 @@ void Update_internal_energy(CellView cons, CellView prims, Sim& sim){
             double kin_e_rho = rho*.5*v2;
 
             // This is a temp total domain replacement of total energy
-            cons(C::E,k,j,i) = prims(P::EINT,k,j,i);// + kin_e_rho;
+            // cons(C::E,k,j,i) = prims(P::EINT,k,j,i) + kin_e_rho;
+            // prims(P::EINT,k,j,i) = (cons(C::E,k,j,i) - kin_e_rho)/rho;
         }
         );
     #endif
@@ -45,9 +46,7 @@ void Initialize_internal_energy(CellView prims, Sim& sim){
           "internal energy update"
         , loop::cells_full(sim)
         , KOKKOS_LAMBDA(const int k, const int j, const int i) {
-
             prims(P::EINT,k,j,i) = prims(P::P,k,j,i) / (sim.grid.gamma - 1.0);
-            prims(P::P,k,j,i) = prims(P::EINT,k,j,i);
         }
         );
 

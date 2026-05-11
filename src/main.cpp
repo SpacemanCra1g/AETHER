@@ -63,7 +63,7 @@ int main() {
                 aether::io::write_snapshot(sim, snap);
             }
 
-        } while (sim.time.t < sim.time.t_end && false); 
+        } while (sim.time.t < sim.time.t_end); 
 
         std::cout << "The final time is " << sim.time.t << "\n";
         aether::io::write_snapshot(sim, snap);

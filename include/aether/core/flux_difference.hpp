@@ -25,11 +25,11 @@ static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
         "flux_sweep",
         loop::cells_interior(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            auto out_p = out;
+            const double dtdx = dtdx_p;
             for (int c = 0; c < numvar; ++c) {
                 const double FR = FW(c, 0, k + koff, j + joff, i + ioff);
                 const double FL = FW(c, 0, k, j, i);
-                auto out_p = out;
-                const double dtdx = dtdx_p;
 
                 if constexpr (dir == sweep_dir::x) {
                     out_p(c, k, j, i) = -dtdx * (FL - FR);

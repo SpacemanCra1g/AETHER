@@ -77,6 +77,7 @@ struct SimulationD<1> {
     FaceView fxL{};
     FaceView fxR{};
     FaceView fx{};
+    CellView flux_diff{};
     bool ctu_enabled{false};
 
     std::array<sweep_dir, 1> sweeps{ sweep_dir::x };
@@ -98,6 +99,7 @@ struct SimulationD<1> {
         FaceView fxL;
         FaceView fxR;
         FaceView fx;
+        CellView flux_diff;
     };
 
     SimulationD() = default;
@@ -114,6 +116,7 @@ struct SimulationD<1> {
           fxL("fxL", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fxR("fxR", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fx ("fx",  numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          flux_diff ("flux_diff",  numvar_full, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           ctu_enabled(compute_ctu_enabled(config))
     {}
 
@@ -132,7 +135,8 @@ struct SimulationD<1> {
             chars,
             fxL,
             fxR,
-            fx
+            fx,
+            flux_diff
         };
     }
 

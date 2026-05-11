@@ -1,9 +1,10 @@
 #pragma once
 
+#include "aether/core/prim_layout.hpp"
 #include <Kokkos_Core.hpp>
-
 #include <aether/core/config.hpp>
 #include <aether/core/Kokkos_Policy.hpp>
+#include <aether/core/Kokkos_loopBounds.hpp>
 #include <aether/core/strides.hpp>  
 #include <aether/physics/counts.hpp>
 
@@ -390,24 +391,24 @@ void scale(CellsT<Policy, NCOMP>& x, double a)
     );
 }
 
-template<class ViewY, class ViewX>
-void axpy(ViewY y, double a, ViewX x)
+template<class SimT, class ViewX>
+void axpy(SimT sim, double a, ViewX x)
 {
-    using exec_space = typename ViewY::execution_space;
+    auto domain = sim.view();
+    auto prim = domain.prim;
+    auto cons = domain.cons;
+    int numvar = SimT::numvar;
+
+    using P = aether::prim::Prim;
 
     Kokkos::parallel_for(
         "axpy_cells",
-        Kokkos::MDRangePolicy<exec_space, Kokkos::Rank<4>>(
-            {0, 0, 0, 0},
-            {
-                static_cast<int>(y.extent(0)),
-                static_cast<int>(y.extent(1)),
-                static_cast<int>(y.extent(2)),
-                static_cast<int>(y.extent(3))
+        aether::loops::cells_full(sim),
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            for (int c = 0; c < numvar; c++){
+                cons(c, k, j, i) += a * x(c, k, j, i);
             }
-        ),
-        KOKKOS_LAMBDA(const int c, const int k, const int j, const int i) {
-            y(c, k, j, i) += a * x(c, k, j, i);
+            prim(P::EINT, k, j, i) += a * x(P::EINT, k, j, i);
         }
     );
 }

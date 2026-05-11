@@ -1,5 +1,4 @@
 #pragma once
-
 #include "aether/core/Kokkos_loopBounds.hpp"
 #include <Kokkos_Core.hpp>
 #include <aether/core/config.hpp>
