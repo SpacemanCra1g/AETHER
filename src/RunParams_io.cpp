@@ -71,6 +71,10 @@ static bool load_run_specification(std::string &s, aether::core::Config &cfg){
     cfg.cfl = std::stod(s.substr(10, s.length() - 10)); 
     return true;
   }
+  if (s.substr(0,10) == "eintSwitch") {
+    cfg.eintSwitch = std::stod(s.substr(10, s.length() - 10)); 
+    return true;
+  }
   else if (s.substr(0,10) == "time_start"){
     cfg.t_start = std::stod(s.substr(19, s.find_last_of(':') - 19)); 
     cfg.t_end = std::stod(s.substr( s.find_last_of(':')+1,s.length() - (s.find_last_of(':')+1))); 

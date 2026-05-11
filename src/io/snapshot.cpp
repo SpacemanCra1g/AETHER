@@ -1,5 +1,5 @@
 #include <Kokkos_Core.hpp>
-
+#include <aether/physics/api.hpp>
 #include <aether/core/config.hpp>
 #include <aether/io/binary_snapshot.hpp>
 #include <aether/core/config_build.hpp>
@@ -11,6 +11,7 @@
 namespace aether::io {
 
 void write_snapshot(aether::core::Simulation& sim, snapshot_request& req) {
+    spec_to_internal_energy(sim.prim, sim);
     sim.time.write_num++;
     for (output_format type : req.formats) {
         switch (type) {
@@ -26,5 +27,6 @@ void write_snapshot(aether::core::Simulation& sim, snapshot_request& req) {
                 throw std::runtime_error("write_snapshot: unknown output format");
         }
     }
+    internal_energy_to_specific(sim.prim, sim);
 }
 } // namespace aether::io

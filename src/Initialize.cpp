@@ -183,7 +183,7 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
             prim(P::RHO,0,0,i) = left ? 1.0 : 0.125;
             prim(P::VX,0,0,i) = 0.0;
             prim(P::P,0,0,i) = left ? 1.0 : 0.1;
-            if constexpr (P::HAS_VY) prim(P::VY,0,0,i) = 0.0;
+            if constexpr (P::HAS_VY) prim(P::VY,0,0,i) = left ? 10.0 : 0.0;
             if constexpr (P::HAS_VZ) prim(P::VZ,0,0,i) = 0.0;
         }
     );

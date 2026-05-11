@@ -7,7 +7,7 @@ snapshot_text_extension = .dat
 snapshot_binary_extension = .bin
 
 dimension = 1
-numvar = 4
+numvar = 5
 scalar_type = double
 payload_kind = primitive
 file_order_binary = (var,k,j,i)
