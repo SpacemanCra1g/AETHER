@@ -28,6 +28,12 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
     auto prim = view.prim;
     const int quad = view.quad;
 
+	auto Src = [&]() {
+        if constexpr (dir == sweep_dir::x) return view.sources_x;
+        else if constexpr (dir == sweep_dir::y) return view.sources_y;
+        else return view.sources_z;
+    }();
+
     auto FL = [&]() {
         if constexpr (dir == sweep_dir::x) return view.fxL;
         else if constexpr (dir == sweep_dir::y) return view.fyL;
@@ -51,6 +57,8 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
                     FL(c, q, k + k0, j + j0, i + i0) = u;
                 }
             }
+			// Track the interpolated pressure terms for the Eint source component
+			Src(0,k,j,i) = prim(P::P, k, j, i);
         }
     );
 }

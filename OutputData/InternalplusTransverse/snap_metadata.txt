@@ -6,7 +6,7 @@ snapshot_prefix = snap
 snapshot_text_extension = .dat
 snapshot_binary_extension = .bin
 
-dimension = 1
+dimension = 2
 numvar = 5
 scalar_type = double
 payload_kind = primitive
@@ -17,11 +17,15 @@ output_plain_txt = false
 output_binary = true
 
 nx = 400
+ny = 400
 ng = 4
 
 x_min = 0.0000000000000000e+00
 x_max = 1.0000000000000000e+00
+y_min = 0.0000000000000000e+00
+y_max = 1.0000000000000000e+00
 
 dx = 2.5000000000000001e-03
+dy = 2.5000000000000001e-03
 gamma = 1.3999999999999999e+00
 quad = 1

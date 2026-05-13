@@ -78,6 +78,8 @@ struct SimulationD<1> {
     FaceView fxR{};
     FaceView fx{};
     CellView flux_diff{};
+	FaceView source_flux_x;
+	CellView sources_x{};
     bool ctu_enabled{false};
 
     std::array<sweep_dir, 1> sweeps{ sweep_dir::x };
@@ -100,6 +102,8 @@ struct SimulationD<1> {
         FaceView fxR;
         FaceView fx;
         CellView flux_diff;
+		FaceView source_flux_x;
+		CellView sources_x;
     };
 
     SimulationD() = default;
@@ -116,7 +120,9 @@ struct SimulationD<1> {
           fxL("fxL", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fxR("fxR", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
           fx ("fx",  numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          flux_diff ("flux_diff",  numvar_full, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          flux_diff ("flux_diff",  numvar_full, cells.Nz, cells.Ny, cells.Nx),
+		  source_flux_x("flux for sources", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+		  sources_x ("source terms", 1, cells.Nz, cells.Ny, cells.Nx),
           ctu_enabled(compute_ctu_enabled(config))
     {}
 
@@ -136,7 +142,9 @@ struct SimulationD<1> {
             fxL,
             fxR,
             fx,
-            flux_diff
+            flux_diff,
+			source_flux_x,
+			sources_x
         };
     }
 
@@ -209,8 +217,17 @@ struct SimulationD<2> {
 
     FaceView fyL{};
     FaceView fyR{};
-    FaceView fy{};
-    bool ctu_enabled{false};
+	FaceView fy{};
+
+	CellView flux_diff{};
+
+	FaceView source_flux_x;
+	CellView sources_x{};
+
+	FaceView source_flux_y;
+	CellView sources_y{};
+
+	bool ctu_enabled{false};
 
     std::array<sweep_dir, 2> sweeps{ sweep_dir::x, sweep_dir::y };
 
@@ -221,9 +238,9 @@ struct SimulationD<2> {
         int ng, quad;
         double gamma;
 
-        CellGrid<2> cells;
-        FaceGridX   xfaces;
-        FaceGridY   yfaces;
+        CellGrid<2>  cells;
+        FaceGridX    xfaces;
+        FaceGridY    yfaces;
 
         CellView prim;
         CellView cons;
@@ -236,6 +253,14 @@ struct SimulationD<2> {
         FaceView fyL;
         FaceView fyR;
         FaceView fy;
+
+		CellView flux_diff{};
+
+		FaceView source_flux_x;
+		CellView sources_x{};
+
+		FaceView source_flux_y;
+		CellView sources_y{};
     };
 
     SimulationD() = default;
@@ -256,6 +281,11 @@ struct SimulationD<2> {
           fyL("fyL", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           fyR("fyR", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
           fy ("fy",  numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+		  flux_diff ("flux_diff",  numvar_full, cells.Nz, cells.Ny, cells.Nx),
+		  source_flux_x("flux for sources in x dir", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+		  sources_x ("source terms in x dir", 1, cells.Nz, cells.Ny, cells.Nx),
+		  source_flux_y("flux for sources in y dir", 1, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+		  sources_y ("source terms in y dir", 1, cells.Nz, cells.Ny, cells.Nx),
           ctu_enabled(compute_ctu_enabled(config))
     {}
 
@@ -278,7 +308,12 @@ struct SimulationD<2> {
             fx,
             fyL,
             fyR,
-            fy
+            fy,
+			flux_diff,
+			source_flux_x,
+			sources_x,
+			source_flux_y,
+			sources_y,
         };
     }
 
@@ -358,6 +393,17 @@ struct SimulationD<3> {
     FaceView fzR{};
     FaceView fz{};
 
+	CellView flux_diff{};
+
+	FaceView source_flux_x{};
+	CellView sources_x{};
+
+	FaceView source_flux_y{};
+	CellView sources_y{};
+
+	FaceView source_flux_z{};
+	CellView sources_z{};
+
     bool ctu_enabled{false};
 
     FaceView ctu_fxL{};
@@ -408,6 +454,17 @@ struct SimulationD<3> {
         FaceView fzL;
         FaceView fzR;
         FaceView fz;
+
+		CellView flux_diff;
+
+		FaceView source_flux_x;
+		CellView sources_x;
+
+		FaceView source_flux_y;
+		CellView sources_y;
+
+		FaceView source_flux_z;
+		CellView sources_z;
     };
 
     struct CTUView {
@@ -455,6 +512,13 @@ struct SimulationD<3> {
           fzL("fzL", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
           fzR("fzR", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
           fz ("fz",  numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+		  flux_diff ("flux_diff",  numvar_full, cells.Nz, cells.Ny, cells.Nx),
+		  source_flux_x("flux for sources in x dir", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+		  sources_x ("source terms in x", 1, cells.Nz, cells.Ny, cells.Nx),
+		  source_flux_y("flux for sources in y dir", 1, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+		  sources_y ("source terms in y dir", 1, cells.Nz, cells.Ny, cells.Nx),
+		  source_flux_z("flux for sources in z dir", 1, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+		  sources_z ("source terms in z dir", 1, cells.Nz, cells.Ny, cells.Nx),
           ctu_enabled(compute_ctu_enabled(config))
     {
         if (ctu_enabled) {
@@ -504,7 +568,14 @@ struct SimulationD<3> {
             fy,
             fzL,
             fzR,
-            fz
+            fz,
+			flux_diff,
+			source_flux_x,
+			sources_x ,
+			source_flux_y,
+			sources_y,
+			source_flux_z,
+			sources_z
         };
     }
 
