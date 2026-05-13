@@ -27,7 +27,7 @@ static AETHER_INLINE void write_plaintext_header(
                  fs::path(snapshot_path).filename().string().c_str());
 
     std::fprintf(f, "# dim=%d  numvar=%d  step=%d\n",
-                 AETHER_DIM, aether::core::Simulation::numvar_full, t.step);
+                 AETHER_DIM, aether::core::Simulation::numvar, t.step);
     std::fprintf(f, "# t=%.16e  dt=%.16e  cfl=%.6f\n", t.t, t.dt, t.cfl);
 
     std::fprintf(f, "# nx=%d", g.nx);
@@ -56,7 +56,7 @@ static AETHER_INLINE void write_plaintext_header(
 static AETHER_INLINE void write_plaintext_column_header(FILE* f) {
     std::fprintf(f,
         "# Variable order: indices (i[,j[,k]]) then state variables v0..v%d\n",
-        aether::core::Simulation::numvar_full - 1);
+        aether::core::Simulation::numvar - 1);
 
     std::fprintf(f, "#");
     if constexpr (AETHER_DIM == 1) {
@@ -67,7 +67,7 @@ static AETHER_INLINE void write_plaintext_column_header(FILE* f) {
         std::fprintf(f, "  i  j  k");
     }
 
-    for (int v = 0; v < aether::core::Simulation::numvar_full; ++v) {
+    for (int v = 0; v < aether::core::Simulation::numvar; ++v) {
         std::fprintf(f, "  v%d", v);
     }
     std::fprintf(f, "\n");
@@ -96,7 +96,7 @@ static AETHER_INLINE void write_plain_text_cell_line(FILE* f,
         std::fprintf(f, "%*d  %*d  %*d", i_width, i, j_width, j, k_width, k);
     }
 
-    for (int c = 0; c < aether::core::Simulation::numvar_full; ++c) {
+    for (int c = 0; c < aether::core::Simulation::numvar; ++c) {
         std::fprintf(f, "  %.16e", prim_h(c, kk, jj, ii));
     }
     std::fprintf(f, "\n");

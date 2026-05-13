@@ -15,15 +15,16 @@ struct Layout<DIM, 1> {
   static constexpr int MX  = 1;
 
   // Presence flags (compile-time)
-  static constexpr bool HAS_MY = (numvar >= 4);
-  static constexpr bool HAS_MZ = (numvar == 5);
+  static constexpr bool HAS_MY = (numvar >= 5);
+  static constexpr bool HAS_MZ = (numvar == 6);
 
   // Indices (−1 when absent; guarded by HAS_* in if constexpr)
   static constexpr int MY = HAS_MY ? 2 : -1;
   static constexpr int MZ = HAS_MZ ? (HAS_MY ? 3 : 2) : -1;
 
   static constexpr int E  = HAS_MZ ? 4 : (HAS_MY ? 3 : 2);
-  static constexpr int COUNT = E + 1;
+  static constexpr int EINT  = E + 1;
+  static constexpr int COUNT = EINT + 1;
 };
 
 // ---------- SRHD ----------
@@ -36,7 +37,8 @@ struct Layout<DIM, 2> {
   static constexpr int MY  = 2;
   static constexpr int MZ  = 3;
   static constexpr int E   = 4;
-  static constexpr int COUNT = 5;
+  static constexpr int EINT   = 5;
+  static constexpr int COUNT = 6;
 
   static constexpr bool HAS_MY = true;
   static constexpr bool HAS_MZ = true;

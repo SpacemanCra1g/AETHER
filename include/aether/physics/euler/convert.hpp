@@ -14,6 +14,7 @@ namespace aether::physics::euler{
         U.my = p.vy*p.rho;
         U.mz = p.vz*p.rho;
         U.E = p.p/(gamma-1.0) + 0.5*p.rho*v2;
+        U.rho_e = p.e ;
         return U;
     }
 
@@ -26,6 +27,7 @@ namespace aether::physics::euler{
         U.my = p.vy*p.rho;
         U.mz = p.vz*p.rho;
         U.E = p.p/(gamma-1.0) + 0.5*p.rho*v2;
+        U.rho_e = p.e;
         return U;
     }
     KOKKOS_INLINE_FUNCTION
@@ -38,7 +40,7 @@ namespace aether::physics::euler{
         V.vz = c.mz*inv_rho;
         const double v2 = V.vx*V.vx + V.vy*V.vy + V.vz*V.vz;
         V.p = (gamma-1.0)*(c.E - 0.5*c.rho*v2);
-
+        V.e = c.rho_e ;
         return V;
     }
 
@@ -52,7 +54,7 @@ namespace aether::physics::euler{
         V.vz = c.mz*inv_rho;
         const double v2 = V.vx*V.vx + V.vy*V.vy + V.vz*V.vz;
         V.p = (gamma-1.0)*(c.E - 0.5*c.rho*v2);
-
+        V.e = c.rho_e;
         return V;
     }
 
@@ -67,7 +69,8 @@ namespace aether::physics::euler{
         F.vx  = W.rho * W.vx * W.vx + W.p;
         F.vy  = W.rho * W.vx * W.vy;
         F.vz  = W.rho * W.vx * W.vz;
-        F.p   = W.vx * (E + W.p); 
+        F.p   = W.vx * (E + W.p);
+        F.e   = F.rho / W.rho;
         return F;
     }
 
@@ -82,7 +85,8 @@ namespace aether::physics::euler{
         F.vx  = W.rho * W.vx * W.vx + W.p;
         F.vy  = W.rho * W.vx * W.vy;
         F.vz  = W.rho * W.vx * W.vz;
-        F.p   = W.vx * (E + W.p); 
+        F.p   = W.vx * (E + W.p);
+        F.e   = F.rho / W.rho;
         return F;
     }
 

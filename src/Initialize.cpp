@@ -52,6 +52,7 @@ static AETHER_INLINE void load_dmr(Sim &sim){
     const double inv_sqr3 = 1.0/std::sqrt(3.0);
     const double post_shock_u = 8.25 * std::cos(PI/6.0);
     const double post_shock_v = -8.25 * std::sin(PI/6.0);
+    const double gamma = sim.grid.gamma;
 
     const double dx = domain.dx;
     const double dy = domain.dy;
@@ -74,6 +75,7 @@ static AETHER_INLINE void load_dmr(Sim &sim){
             prim(P::VX , 0, j, i) = (pre_shock) ? 0.0 : post_shock_u;
             prim(P::VY , 0, j, i) = (pre_shock) ? 0.0 : post_shock_v;
             prim(P::P  , 0, j, i) = (pre_shock) ? 1.0 : 116.5;
+            prim(P::EINT,0,0,i) = prim(P::P,0,0,i) / (prim(P::RHO,0,0,i) * (gamma - 1.0));
         }
     );
 }
@@ -83,6 +85,7 @@ static AETHER_INLINE void load_sedov(Sim &sim){
     auto domain = sim.view();
     auto& g = sim.grid;
     auto prim = domain.prim;
+
 
     constexpr double PI = 3.14159265358979323846;
     const double cen_x = (g.x_min + g.x_max)*.5;
@@ -120,6 +123,7 @@ static AETHER_INLINE void load_sedov(Sim &sim){
                 prim(P::VX  ,0 ,j ,i) = 0.0;
                 prim(P::VY  ,0 ,j ,i) = 0.0;
                 prim(P::P   ,0 ,j ,i) = (circ) ? blast : 1.e-5;
+                prim(P::EINT,0,0,i) = prim(P::P,0,0,i) / (prim(P::RHO,0,0,i) * (gam - 1.0));
             }
         );
     } 
@@ -155,6 +159,7 @@ static AETHER_INLINE void load_sedov(Sim &sim){
                 prim(P::VY  ,k ,j ,i) = 0.0;
                 prim(P::VZ  ,k ,j ,i) = 0.0;
                 prim(P::P   ,k ,j ,i) = (circ) ? blast : 1.e-5;
+                prim(P::EINT,0,0,i) = prim(P::P,0,0,i) / (prim(P::RHO,0,0,i) * (gam - 1.0));
             }
         );
     }
@@ -166,6 +171,7 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
     const double domain_mid = .5*(sim.grid.x_max + sim.grid.x_min);
     const double dx = sim.grid.dx;
     const double x_min = sim.grid.x_min;
+    const double gamma = sim.grid.gamma;
 
     auto domain = sim.view();
     auto prim = domain.prim;
@@ -185,6 +191,7 @@ static AETHER_INLINE void load_sod_shocktube(Sim &sim){
             prim(P::P,0,0,i) = left ? 1.0 : 0.1;
             if constexpr (P::HAS_VY) prim(P::VY,0,0,i) = left ? 10.0 : 0.0;
             if constexpr (P::HAS_VZ) prim(P::VZ,0,0,i) = 0.0;
+            prim(P::EINT,0,0,i) = prim(P::P,0,0,i) / ( (gamma - 1.0));
         }
     );
 }
@@ -193,6 +200,7 @@ template<typename Sim>
 static AETHER_INLINE void load_sod_y(Sim &sim){
     auto domain = sim.view();
     auto& g = sim.grid;
+    const double gamma = sim.grid.gamma;
     const double domain_mid = .5*(g.y_max + g.y_min);
     const double dy = domain.dy;
     const double y_min = g.y_min;
@@ -211,6 +219,7 @@ static AETHER_INLINE void load_sod_y(Sim &sim){
             prim(P::RHO, 0, j, i) = (left) ? 1.0 : 0.125;
             prim(P::VX , 0, j, i) = 0.0;
             prim(P::P  , 0, j, i) = (left) ? 1.0 : 0.1;
+            prim(P::EINT,0,0,i) = prim(P::P,0,0,i) / (prim(P::RHO,0,0,i) * (gamma - 1.0));
         }
     );
 }
@@ -219,6 +228,7 @@ template<typename Sim>
 static AETHER_INLINE void load_sod_z(Sim &sim){
     auto domain = sim.view();
     auto& g = sim.grid;
+    const double gamma = sim.grid.gamma;
     auto prim = domain.prim;
     const double domain_mid = .5*(g.z_max + g.z_min);
     const double dz = domain.dz;
@@ -237,6 +247,7 @@ static AETHER_INLINE void load_sod_z(Sim &sim){
             prim(P::RHO, k, j, i) = (left) ? 1.0 : 0.125;
             prim(P::VX , k, j, i) = 0.0;
             prim(P::P  , k, j, i) = (left) ? 1.0 : 0.1;
+            prim(P::EINT,0,0,i) = prim(P::P,0,0,i) / (prim(P::RHO,0,0,i) * (gamma - 1.0));
         }
     );
 }

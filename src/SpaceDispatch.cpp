@@ -19,7 +19,7 @@ using P = aether::prim::Prim;
 
 template<sweep_dir dir, class Sim>
 AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
-    constexpr int numvar = aether::phys_ct::numvar_prim_full;
+    constexpr int numvar = aether::phys_ct::numvar;
     constexpr int i0 = (dir == sweep_dir::x) ? 1 : 0;
     constexpr int j0 = (dir == sweep_dir::y) ? 1 : 0;
     constexpr int k0 = (dir == sweep_dir::z) ? 1 : 0;

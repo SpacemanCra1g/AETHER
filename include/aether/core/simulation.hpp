@@ -55,7 +55,6 @@ template<>
 struct SimulationD<1> {
     static constexpr int dim = 1;
     static constexpr int numvar = aether::phys_ct::numvar;
-    static constexpr int numvar_full = aether::phys_ct::numvar_prim_full;    
 
     using policy_type = aether::kokkos_cfg::Policy<1, AETHER_PHYSICS_KIND>;
 
@@ -114,13 +113,13 @@ struct SimulationD<1> {
           grid(fill_grid(config)),
           cells(grid.nx, grid.ng),
           xfaces(cells),
-          prim("prim", numvar_full, cells.Nz, cells.Ny, cells.Nx),
+          prim("prim", numvar, cells.Nz, cells.Ny, cells.Nx),
           cons("cons", numvar, cells.Nz, cells.Ny, cells.Nx),
           chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
-          fxL("fxL", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fxR("fxR", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fx ("fx",  numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          flux_diff ("flux_diff",  numvar_full, cells.Nz, cells.Ny, cells.Nx),
+          fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          flux_diff ("flux_diff",  numvar, cells.Nz, cells.Ny, cells.Nx),
 		  source_flux_x("flux for sources", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
 		  sources_x ("source terms", 1, cells.Nz, cells.Ny, cells.Nx),
           ctu_enabled(compute_ctu_enabled(config))
@@ -191,7 +190,6 @@ template<>
 struct SimulationD<2> {
     static constexpr int dim = 2;
     static constexpr int numvar = aether::phys_ct::numvar;
-    static constexpr int numvar_full = aether::phys_ct::numvar_prim_full;
 
     using policy_type = aether::kokkos_cfg::Policy<2, AETHER_PHYSICS_KIND>;
 
@@ -272,16 +270,16 @@ struct SimulationD<2> {
           cells(grid.nx, grid.ny, grid.ng),
           xfaces(cells),
           yfaces(cells),
-          prim("prim", numvar_full, cells.Nz, cells.Ny, cells.Nx),
+          prim("prim", numvar, cells.Nz, cells.Ny, cells.Nx),
           cons("cons", numvar, cells.Nz, cells.Ny, cells.Nx),
           chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
-          fxL("fxL", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fxR("fxR", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fx ("fx",  numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fyL("fyL", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          fyR("fyR", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          fy ("fy",  numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-		  flux_diff ("flux_diff",  numvar_full, cells.Nz, cells.Ny, cells.Nx),
+          fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fyL("fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+		  flux_diff ("flux_diff",  numvar, cells.Nz, cells.Ny, cells.Nx),
 		  source_flux_x("flux for sources in x dir", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
 		  sources_x ("source terms in x dir", 1, cells.Nz, cells.Ny, cells.Nx),
 		  source_flux_y("flux for sources in y dir", 1, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
@@ -360,7 +358,6 @@ template<>
 struct SimulationD<3> {
     static constexpr int dim = 3;
     static constexpr int numvar = aether::phys_ct::numvar;
-    static constexpr int numvar_full = aether::phys_ct::numvar_prim_full;
 
     using policy_type = aether::kokkos_cfg::Policy<3, AETHER_PHYSICS_KIND>;
 
@@ -500,19 +497,19 @@ struct SimulationD<3> {
           xfaces(cells),
           yfaces(cells),
           zfaces(cells),
-          prim("prim", numvar_full, cells.Nz, cells.Ny, cells.Nx),
+          prim("prim", numvar, cells.Nz, cells.Ny, cells.Nx),
           cons("cons", numvar, cells.Nz, cells.Ny, cells.Nx),
           chars("chars", dim, numvar, cells.Nz, cells.Ny, cells.Nx),
-          fxL("fxL", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fxR("fxR", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fx ("fx",  numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
-          fyL("fyL", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          fyR("fyR", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          fy ("fy",  numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
-          fzL("fzL", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
-          fzR("fzR", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
-          fz ("fz",  numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
-		  flux_diff ("flux_diff",  numvar_full, cells.Nz, cells.Ny, cells.Nx),
+          fxL("fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fxR("fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fx ("fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
+          fyL("fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fyR("fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fy ("fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
+          fzL("fzL", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+          fzR("fzR", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+          fz ("fz",  numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx),
+		  flux_diff ("flux_diff",  numvar, cells.Nz, cells.Ny, cells.Nx),
 		  source_flux_x("flux for sources in x dir", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx),
 		  sources_x ("source terms in x", 1, cells.Nz, cells.Ny, cells.Nx),
 		  source_flux_y("flux for sources in y dir", 1, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx),
@@ -522,26 +519,26 @@ struct SimulationD<3> {
           ctu_enabled(compute_ctu_enabled(config))
     {
         if (ctu_enabled) {
-            ctu_fxL = FaceView("ctu_fxL", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
-            ctu_fxR = FaceView("ctu_fxR", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
-            ctu_fx  = FaceView("ctu_fx",  numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_fxL = FaceView("ctu_fxL", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_fxR = FaceView("ctu_fxR", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_fx  = FaceView("ctu_fx",  numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
 
-            ctu_fyL = FaceView("ctu_fyL", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
-            ctu_fyR = FaceView("ctu_fyR", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
-            ctu_fy  = FaceView("ctu_fy",  numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_fyL = FaceView("ctu_fyL", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_fyR = FaceView("ctu_fyR", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_fy  = FaceView("ctu_fy",  numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
 
-            ctu_fzL = FaceView("ctu_fzL", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
-            ctu_fzR = FaceView("ctu_fzR", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
-            ctu_fz  = FaceView("ctu_fz",  numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_fzL = FaceView("ctu_fzL", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_fzR = FaceView("ctu_fzR", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_fz  = FaceView("ctu_fz",  numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
 
-            ctu_xL_bak = FaceView("ctu_xL_bak", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
-            ctu_xR_bak = FaceView("ctu_xR_bak", numvar_full, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_xL_bak = FaceView("ctu_xL_bak", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+            ctu_xR_bak = FaceView("ctu_xR_bak", numvar, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
 
-            ctu_yL_bak = FaceView("ctu_yL_bak", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
-            ctu_yR_bak = FaceView("ctu_yR_bak", numvar_full, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_yL_bak = FaceView("ctu_yL_bak", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+            ctu_yR_bak = FaceView("ctu_yR_bak", numvar, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
 
-            ctu_zL_bak = FaceView("ctu_zL_bak", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
-            ctu_zR_bak = FaceView("ctu_zR_bak", numvar_full, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_zL_bak = FaceView("ctu_zL_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+            ctu_zR_bak = FaceView("ctu_zR_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
         }
     }
 

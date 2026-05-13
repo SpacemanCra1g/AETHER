@@ -65,7 +65,7 @@ static AETHER_INLINE void write_run_metadata(const aether::core::Simulation& sim
     std::fprintf(f, "snapshot_binary_extension = .bin\n\n");
 
     std::fprintf(f, "dimension = %d\n", AETHER_DIM);
-    std::fprintf(f, "numvar = %d\n", aether::core::Simulation::numvar_full);
+    std::fprintf(f, "numvar = %d\n", aether::core::Simulation::numvar);
     std::fprintf(f, "scalar_type = double\n");
     std::fprintf(f, "payload_kind = primitive\n");
     std::fprintf(f, "file_order_binary = (var,k,j,i)\n");

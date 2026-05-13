@@ -11,7 +11,6 @@
 namespace aether::io {
 
 void write_snapshot(aether::core::Simulation& sim, snapshot_request& req) {
-    spec_to_internal_energy(sim.prim, sim);
     sim.time.write_num++;
     for (output_format type : req.formats) {
         switch (type) {
@@ -27,6 +26,5 @@ void write_snapshot(aether::core::Simulation& sim, snapshot_request& req) {
                 throw std::runtime_error("write_snapshot: unknown output format");
         }
     }
-    internal_energy_to_specific(sim.prim, sim);
 }
 } // namespace aether::io

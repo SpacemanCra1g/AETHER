@@ -408,7 +408,7 @@ void axpy(SimT sim, double a, ViewX x)
             for (int c = 0; c < numvar; c++){
                 cons(c, k, j, i) += a * x(c, k, j, i);
             }
-            prim(P::EINT, k, j, i) += a * x(P::EINT, k, j, i);
+            // prim(P::EINT, k, j, i) += a * x(P::EINT, k, j, i);
         }
     );
 }

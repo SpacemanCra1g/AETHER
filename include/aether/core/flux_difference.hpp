@@ -33,30 +33,24 @@ static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
             auto out_p = out;
             const double dtdx = dtdx_p;
+            // Update Eint component using p_bar (stored in source array)
+			// F^2 fluxes (stored in source_flux)
+			// for details see reference "A Simple Dual Implementation to Track Pressure" Li 2008
+            const double SR = source_flux(0, 0, k + koff, j + joff, i + ioff);
+            const double SL = source_flux(0, 0, k, j, i);
+			const double pbar = source(0,k,j,i);
             for (int c = 0; c < numvar; ++c) {
                 const double FR = FW(c, 0, k + koff, j + joff, i + ioff);
                 const double FL = FW(c, 0, k, j, i);
 
                 if constexpr (dir == sweep_dir::x) {
-                    out_p(c, k, j, i) = -dtdx * (FL - FR);
+                    out_p(c, k, j, i) = -dtdx * (FL - FR + (P::EINT==c) * pbar * (SL-SR) );
 
                 } else {
-                    out_p(c, k, j, i) += -dtdx * (FL - FR);
+                    out_p(c, k, j, i) += -dtdx * (FL - FR + (P::EINT==c) * pbar*(SL-SR));
                 }
             }
-			// Update Eint component using p_bar (stored in source array)
-			// F^2 fluxes (stored in source_flux) and F^1 stored in flux array
-			// for details see reference "A Simple Dual Implementation to Track Pressure" Li 2008
-			const double FR = FW(P::EINT, 0, k + koff, j + joff, i + ioff);
-            const double FL = FW(P::EINT, 0, k, j, i);
-			const double SR = source_flux(0, 0, k + koff, j + joff, i + ioff);
-            const double SL = source_flux(0, 0, k, j, i);
-			const double pbar = source(0,k,j,i);
-			if constexpr (dir == sweep_dir::x) {
-                out_p(P::EINT, k, j, i) = -dtdx * ((FL - FR) + pbar*(SL-SR));
-			} else {
-				out_p(P::EINT, k, j, i) += -dtdx * ((FL - FR) + pbar*(SL-SR));
-			}
+
 
         }
     );

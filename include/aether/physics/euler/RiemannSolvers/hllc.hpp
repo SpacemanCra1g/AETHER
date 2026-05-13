@@ -73,77 +73,85 @@ prims hllc(const prims& L, const prims& R, double gamma) noexcept {
 
     // Supersonic left
     if (0.0 <= SL) {
-        return flux_from_prim_cell(L, gamma);
+        Flux = flux_from_prim_cell(L, gamma);
     }
 
     // Supersonic right
-    if (SR <= 0.0) {
-        return flux_from_prim_cell(R, gamma);
+    else if (SR <= 0.0) {
+        Flux = flux_from_prim_cell(R, gamma);
+    }
+    else {
+
+        // -----------------------------
+        // Contact wave speed S*
+        // -----------------------------
+        const double num = pR - pL
+                         + rhoL * uL * (SL - uL)
+                         - rhoR * uR * (SR - uR);
+
+        const double den = rhoL * (SL - uL)
+                         - rhoR * (SR - uR);
+
+        const double SM = num / den;
+
+        // Star-region pressure from either side
+        const double pStarL = pL + rhoL * (SL - uL) * (SM - uL);
+        const double pStarR = pR + rhoR * (SR - uR) * (SM - uR);
+        const double pStar  = 0.5 * (pStarL + pStarR);
+
+        // -----------------------------
+        // Left star state
+        // -----------------------------
+        const double rhoStarL = rhoL * (SL - uL) / (SL - SM);
+
+        const double UStarL0 = rhoStarL;
+        const double UStarL1 = rhoStarL * SM;
+        const double UStarL2 = rhoStarL * vL;
+        const double UStarL3 = rhoStarL * wL;
+
+        const double EStarL =
+            ((SL - uL) * EL - pL * uL + pStar * SM) / (SL - SM);
+
+        const double UStarL4 = EStarL;
+
+        // -----------------------------
+        // Right star state
+        // -----------------------------
+        const double rhoStarR = rhoR * (SR - uR) / (SR - SM);
+
+        const double UStarR0 = rhoStarR;
+        const double UStarR1 = rhoStarR * SM;
+        const double UStarR2 = rhoStarR * vR;
+        const double UStarR3 = rhoStarR * wR;
+
+        const double EStarR =
+            ((SR - uR) * ER - pR * uR + pStar * SM) / (SR - SM);
+
+        const double UStarR4 = EStarR;
+
+        // -----------------------------
+        // HLLC flux selection
+        // -----------------------------
+        if (0.0 <= SM) {
+            Flux.rho = FL0 + SL * (UStarL0 - UL0);
+            Flux.vx  = FL1 + SL * (UStarL1 - UL1);
+            Flux.vy  = FL2 + SL * (UStarL2 - UL2);
+            Flux.vz  = FL3 + SL * (UStarL3 - UL3);
+            Flux.p   = FL4 + SL * (UStarL4 - UL4);
+        } else {
+            Flux.rho = FR0 + SR * (UStarR0 - UR0);
+            Flux.vx  = FR1 + SR * (UStarR1 - UR1);
+            Flux.vy  = FR2 + SR * (UStarR2 - UR2);
+            Flux.vz  = FR3 + SR * (UStarR3 - UR3);
+            Flux.p   = FR4 + SR * (UStarR4 - UR4);
+        }
     }
 
-    // -----------------------------
-    // Contact wave speed S*
-    // -----------------------------
-    const double num = pR - pL
-                     + rhoL * uL * (SL - uL)
-                     - rhoR * uR * (SR - uR);
 
-    const double den = rhoL * (SL - uL)
-                     - rhoR * (SR - uR);
-
-    const double SM = num / den;
-
-    // Star-region pressure from either side
-    const double pStarL = pL + rhoL * (SL - uL) * (SM - uL);
-    const double pStarR = pR + rhoR * (SR - uR) * (SM - uR);
-    const double pStar  = 0.5 * (pStarL + pStarR);
-
-    // -----------------------------
-    // Left star state
-    // -----------------------------
-    const double rhoStarL = rhoL * (SL - uL) / (SL - SM);
-
-    const double UStarL0 = rhoStarL;
-    const double UStarL1 = rhoStarL * SM;
-    const double UStarL2 = rhoStarL * vL;
-    const double UStarL3 = rhoStarL * wL;
-
-    const double EStarL =
-        ((SL - uL) * EL - pL * uL + pStar * SM) / (SL - SM);
-
-    const double UStarL4 = EStarL;
-
-    // -----------------------------
-    // Right star state
-    // -----------------------------
-    const double rhoStarR = rhoR * (SR - uR) / (SR - SM);
-
-    const double UStarR0 = rhoStarR;
-    const double UStarR1 = rhoStarR * SM;
-    const double UStarR2 = rhoStarR * vR;
-    const double UStarR3 = rhoStarR * wR;
-
-    const double EStarR =
-        ((SR - uR) * ER - pR * uR + pStar * SM) / (SR - SM);
-
-    const double UStarR4 = EStarR;
-
-    // -----------------------------
-    // HLLC flux selection
-    // -----------------------------
-    if (0.0 <= SM) {
-        Flux.rho = FL0 + SL * (UStarL0 - UL0);
-        Flux.vx  = FL1 + SL * (UStarL1 - UL1);
-        Flux.vy  = FL2 + SL * (UStarL2 - UL2);
-        Flux.vz  = FL3 + SL * (UStarL3 - UL3);
-        Flux.p   = FL4 + SL * (UStarL4 - UL4);
-    } else {
-        Flux.rho = FR0 + SR * (UStarR0 - UR0);
-        Flux.vx  = FR1 + SR * (UStarR1 - UR1);
-        Flux.vy  = FR2 + SR * (UStarR2 - UR2);
-        Flux.vz  = FR3 + SR * (UStarR3 - UR3);
-        Flux.p   = FR4 + SR * (UStarR4 - UR4);
-    }
+    // Calculate and store the internal_energy flux and int_e source flux
+    Flux.e = Flux.rho * ( (Flux.rho >= 0.0)
+                       ? L.e / L.rho
+                       : R.e / R.rho );
 
     return Flux;
 }

@@ -12,7 +12,7 @@ int main() {
 
     using namespace aether::core;
     {
-    // feenableexcept(FE_INVALID);        
+    feenableexcept(FE_INVALID);
         Kokkos::initialize();
 
         // Load run parameters
@@ -39,8 +39,6 @@ int main() {
         //  load initial conditions and prepare for run 
         initialize_domain(sim);
         auto domain = sim.view();     
-        
-        Initialize_internal_energy(domain.prim, sim);
 
         // Write time = 0 
         aether::io::write_snapshot(sim, snap);

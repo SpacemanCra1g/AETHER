@@ -89,10 +89,8 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                 }
                 Flux(P::P, q, k, j, i) = F.p;
 
-                // Calculate and store the internal_energy flux and int_e source flux
-                Flux(P::EINT,q,k,j,i) = F.rho * ((F.rho >= 0.0)
-                                        ? FL(P::EINT, q, k, j, i) / L.rho
-												 : FR(P::EINT, q, k, j, i) / R.rho);
+                Flux(P::EINT,q,k,j,i) = F.e;
+
 				// For now the Eint term is the only source term being tracked, so this array has dim (1,q,NZ,NY,NX)
 				// Remember to update this for additional sources
                 source_flux(0,q,k,j,i) = F.rho * ((F.rho >= 0.0) ? 1.0 / L.rho : 1.0 / R.rho);
