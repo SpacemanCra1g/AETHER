@@ -58,6 +58,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                     L.vz = FL(VelMap<dir>::VT2, q, k, j, i);
                 }
                 L.p   = FL(P::P, q, k, j, i);
+				L.e   = FL(P::EINT, q, k, j, i);
 
                 // Gather right state in solver-normal ordering
                 R.rho = FR(P::RHO, q, k, j, i);
@@ -71,6 +72,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                     R.vz = FR(VelMap<dir>::VT2, q, k, j, i);
                 }
                 R.p   = FR(P::P, q, k, j, i);
+				R.e   = FR(P::EINT, q, k, j, i);
 
                 if constexpr (solv == riemann::hll) {
                     F = hll(L, R, gamma);
@@ -89,6 +91,7 @@ AETHER_INLINE void Riemann_sweep(Sim& sim, V& v) noexcept {
                 }
                 Flux(P::P, q, k, j, i) = F.p;
 
+				// This component now contains F1 from equation (6,7) of Li 2008 paper
                 Flux(P::EINT,q,k,j,i) = F.e;
 
 				// For now the Eint term is the only source term being tracked, so this array has dim (1,q,NZ,NY,NX)

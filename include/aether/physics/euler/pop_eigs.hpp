@@ -413,16 +413,16 @@ void fill_eigenvectors(
     const double gamma)
 {
     if constexpr (AETHER_DIM == 1) {
-        if constexpr (P::COUNT == 3) {
+        if constexpr (P::COUNT == 4) {
             D1_X_EigenMatrix(p, chars, gamma);
-        } else if constexpr (P::COUNT == 4) {
+        } else if constexpr (P::COUNT == 5) {
             D2_X_EigenMatrix(p, chars, gamma);
         } else {
             D3_X_EigenMatrix(p, chars, gamma);
         }
     }
     else if constexpr (AETHER_DIM == 2) {
-        if constexpr (P::COUNT == 4) {
+        if constexpr (P::COUNT == 5) {
             D2_X_EigenMatrix(p, chars, gamma);
             D2_Y_EigenMatrix(p, chars, gamma);
         } else {

@@ -399,8 +399,6 @@ void axpy(SimT sim, double a, ViewX x)
     auto cons = domain.cons;
     int numvar = SimT::numvar;
 
-    using P = aether::prim::Prim;
-
     Kokkos::parallel_for(
         "axpy_cells",
         aether::loops::cells_full(sim),
@@ -408,7 +406,6 @@ void axpy(SimT sim, double a, ViewX x)
             for (int c = 0; c < numvar; c++){
                 cons(c, k, j, i) += a * x(c, k, j, i);
             }
-            // prim(P::EINT, k, j, i) += a * x(P::EINT, k, j, i);
         }
     );
 }

@@ -401,6 +401,15 @@ struct SimulationD<3> {
 	FaceView source_flux_z{};
 	CellView sources_z{};
 
+    FaceView ctu_source_flux_x{};
+	CellView ctu_sources_x{};
+
+	FaceView ctu_source_flux_y{};
+	CellView ctu_sources_y{};
+
+	FaceView ctu_source_flux_z{};
+	CellView ctu_sources_z{};
+
     bool ctu_enabled{false};
 
     FaceView ctu_fxL{};
@@ -485,6 +494,12 @@ struct SimulationD<3> {
         FaceView yR_bak;
         FaceView zL_bak;
         FaceView zR_bak;
+
+		FaceView source_flux_x;
+
+		FaceView source_flux_y;
+
+		FaceView source_flux_z;
     };
 
     SimulationD() = default;
@@ -539,6 +554,10 @@ struct SimulationD<3> {
 
             ctu_zL_bak = FaceView("ctu_zL_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
             ctu_zR_bak = FaceView("ctu_zR_bak", numvar, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
+
+			ctu_source_flux_x = FaceView("flux for sources in x dir", 1, grid.quad, xfaces.Nz, xfaces.Ny, xfaces.Nfx);
+			ctu_source_flux_y = FaceView("flux for sources in y dir", 1, grid.quad, yfaces.Nz, yfaces.Nfy, yfaces.Nx);
+			ctu_source_flux_z = FaceView("flux for sources in z dir", 1, grid.quad, zfaces.Nfz, zfaces.Ny, zfaces.Nx);
         }
     }
 
@@ -585,7 +604,10 @@ struct SimulationD<3> {
             ctu_fzL, ctu_fzR, ctu_fz,
             ctu_xL_bak, ctu_xR_bak,
             ctu_yL_bak, ctu_yR_bak,
-            ctu_zL_bak, ctu_zR_bak
+            ctu_zL_bak, ctu_zR_bak,
+			ctu_source_flux_x,
+			ctu_source_flux_y,
+			ctu_source_flux_z
         };
     }
 
@@ -627,8 +649,6 @@ private:
         t.RK_stage  = 0;
         return t;
     }
-
-
 };
 
 // ============================================================

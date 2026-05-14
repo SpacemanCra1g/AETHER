@@ -39,7 +39,7 @@ void cons_to_prims_domain(aether::core::Simulation &sim){
             if constexpr (P::HAS_VY) prim_array(P::VY,k,j,i) = prim.vy;
             if constexpr (P::HAS_VZ) prim_array(P::VZ,k,j,i) = prim.vz;
             prim_array(P::P,k,j,i)   = prim.p;
-            prim_array(P::EINT,k,j,i)   = prim.e;
+            prim_array(P::EINT,k,j,i) = prim.e;
         }
     );
 

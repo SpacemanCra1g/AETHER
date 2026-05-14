@@ -18,7 +18,7 @@ void Time_stepper(Simulation& sim){
             Riemann_dispatch(sim, domain);
             flux_diff_sweep(domain.flux_diff, sim);
             axpy(sim, -1.0, domain.flux_diff);
-            Update_internal_energy(domain.cons, domain.prim,sim);
+            Update_internal_energy(domain.cons, sim);
             break;
         
         case time_stepper::char_trace:
@@ -27,7 +27,7 @@ void Time_stepper(Simulation& sim){
             Riemann_dispatch(sim, domain);
             flux_diff_sweep(domain.flux_diff, sim);
             axpy(sim, -1.0, domain.flux_diff);
-            Update_internal_energy(domain.cons, domain.prim,sim);
+            Update_internal_energy(domain.cons, sim);
             break;
 
         default:

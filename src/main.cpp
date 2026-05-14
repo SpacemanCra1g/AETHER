@@ -12,7 +12,7 @@ int main() {
 
     using namespace aether::core;
     {
-    feenableexcept(FE_INVALID);
+    // feenableexcept(FE_INVALID);
         Kokkos::initialize();
 
         // Load run parameters

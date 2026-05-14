@@ -75,7 +75,7 @@ prims hll(const prims& L, const prims& R, double gamma) noexcept {
     Flux.p   = inv_dS * (SR*FL4 - SL*FR4 + SRSL*(UR4 - UL4));
     }
 
-    // Calculate and store the internal_energy flux and int_e source flux
+    // Calculate and store the internal_energy flux
     Flux.e = Flux.rho * ( (Flux.rho >= 0.0)
                        ? L.e / L.rho
                        : R.e / R.rho );

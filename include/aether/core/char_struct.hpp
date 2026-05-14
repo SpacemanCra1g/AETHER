@@ -72,6 +72,6 @@ template <int Dim, int NumVar>
 using one_cell_spectral_containerT = spectral_cell_t<Dim, NumVar>;
 
 using one_cell_spectral_container =
-    one_cell_spectral_containerT<AETHER_DIM, aether::phys_ct::numvar>;
+    one_cell_spectral_containerT<AETHER_DIM, aether::phys_ct::numvar-1>;
 
 } // namespace aether::core

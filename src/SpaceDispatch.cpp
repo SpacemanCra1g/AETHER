@@ -10,7 +10,7 @@
 #include <aether/core/slope_limiters.hpp>
 
 using chars = aether::core::one_cell_spectral_container;
-using vec   = aether::math::Vec<aether::phys_ct::numvar>;
+using vec   = aether::math::Vec<aether::phys_ct::numvar - 1>;
 using prims = aether::phys::prims;
 
 namespace aether::core {
@@ -46,16 +46,21 @@ AETHER_INLINE void FOG_sweep(Sim& sim) noexcept {
         else return view.fzR;
     }();
 
+	// The FR and FL arrays store the interpolated reconstructions at cell interfaces
     Kokkos::parallel_for(
         "FOG_sweep",
         loops::solver_sweep_policy(sim),
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 const double u = prim(c, k, j, i);
                 for (int q = 0; q < quad; ++q) {
                     FR(c, q, k,      j,      i)      = u;
                     FL(c, q, k + k0, j + j0, i + i0) = u;
                 }
+            }
+			for (int q = 0; q < quad; ++q) {
+                    FR(P::EINT, q, k,      j,      i)      = prim(P::EINT, k, j, i) * prim(P::RHO, k, j, i);
+                    FL(P::EINT, q, k + k0, j + j0, i + i0) = prim(P::EINT, k, j, i) * prim(P::RHO, k, j, i);
             }
 			// Track the interpolated pressure terms for the Eint source component
 			Src(0,k,j,i) = prim(P::P, k, j, i);
@@ -69,6 +74,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
 
     auto view = sim.view();
     auto prim = view.prim;
+	auto x_src = view.sources_x;
 
     const double inv_dx = 1.0 / view.dx;
     const double inv_dy = 1.0 / view.dy;
@@ -86,7 +92,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
             prims p;
             chars Eigs;
 
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 p_vec[c]   = prim(c, k, j, i);
                 p_vec_L[c] = prim(c, k, j, i - 1);
                 p_vec_R[c] = prim(c, k, j, i + 1);
@@ -98,26 +104,42 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
             if constexpr (P::HAS_VZ) p.vz = p_vec[P::VZ];
             p.p = p_vec[P::P];
 
+			double eint = prim(P::EINT,k,j,i) * prim(P::RHO,k,j,i);
+			double eintL = prim(P::EINT,k,j,i-1) * prim(P::RHO,k,j,i-1);
+			double eintR = prim(P::EINT,k,j,i+1) * prim(P::RHO,k,j,i+1);
+
             fill_eigenvectors(p, Eigs, view.gamma);
 
             vec d_w;
+			double dw_eint;
 
             if constexpr (TVD == limiter::minmod) {
                 d_w = minmod(Eigs.x.left * (p_vec - p_vec_L),
                              Eigs.x.left * (p_vec_R - p_vec));
+				dw_eint = minmod(eint-eintL,eintR-eint);
             } else if constexpr (TVD == limiter::mc) {
                 d_w = mc(0.5 * Eigs.x.left * (p_vec_R - p_vec_L),
                          2.0 * Eigs.x.left * (p_vec_R - p_vec),
                          2.0 * Eigs.x.left * (p_vec - p_vec_L));
+				dw_eint = mc(0.5*(eintR-eintL), 2.0*(eintR - eint), 2.0*(eint - eintL));
             } else if constexpr (TVD == limiter::vanleer) {
                 d_w = van_leer(Eigs.x.left * (p_vec - p_vec_L),
                                Eigs.x.left * (p_vec_R - p_vec));
+				dw_eint = van_leer( (eint- eintL), (eintR - eint) );
             }
 
             p_vec_L = p_vec;
             p_vec_R = p_vec;
 
-            for (int c = 0; c < numvar; ++c) {
+			// track the internal energy
+			double eintL_old = eintL;
+			double eintR_old = eintR;
+
+			eintL = eint - 0.5 * dw_eint;
+			eintR = eint + 0.5 * dw_eint;
+
+			// Characteristic tracing on the regular variables
+            for (int c = 0; c < numvar-1; ++c) {
                 const double eig = Eigs.x.lambda(c);
                 if (eig >= 0.0) {
                     p_vec_R += 0.5 * (1.0 - eig * dtx) * d_w[c] * col(Eigs.x.right, c);
@@ -126,15 +148,32 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                 }
             }
 
-            for (int c = 0; c < numvar; ++c) {
+			// characteristic trace on eint
+			double u = prim(P::VX,k,j,i);
+			eintR -= 0.5*( (u >= 0.0) ? u : 0.0 ) * dtx * dw_eint;
+			eintL -= 0.5*( (u <= 0.0) ? u : 0.0 ) * dtx * dw_eint;
+
+			// Ensure interp points lie between cell centered values
+			if (eintL < std::fmin(eint, eintL_old) || eintL > std::fmax(eint, eintL_old) ){
+				eintL = eint;
+			}
+			if (eintR < std::fmin(eint, eintR_old) || eintR > std::fmax(eint, eintR_old) ){
+				eintR = eint;
+			}
+
+            for (int c = 0; c < numvar-1; ++c) {
                 for (int q = 0; q < view.quad; ++q) {
                     view.fxR(c, q, k, j, i)   = p_vec_L[c];
                     view.fxL(c, q, k, j, i+1) = p_vec_R[c];
                 }
             }
+			for (int q = 0; q < view.quad; ++q) view.fxR(P::EINT,q,k,j,i)   = eintL;
+			for (int q = 0; q < view.quad; ++q) view.fxL(P::EINT,q,k,j,i+1) = eintR;
+
+			x_src(0,k,j,i) = 0.5 * (p_vec_L[P::P] + p_vec_R[P::P]);
 
             if constexpr (dim > 1) {
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     p_vec_L[c] = prim(c, k, j - 1, i);
                     p_vec_R[c] = prim(c, k, j + 1, i);
                 }
@@ -154,7 +193,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                 p_vec_L = p_vec;
                 p_vec_R = p_vec;
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     const double eig = Eigs.y.lambda(c);
                     if (eig >= 0.0) {
                         p_vec_R += 0.5 * (1.0 - eig * dty) * d_w[c] * col(Eigs.y.right, c);
@@ -163,7 +202,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                     }
                 }
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fyR(c, q, k, j,   i) = p_vec_L[c];
                         view.fyL(c, q, k, j+1, i) = p_vec_R[c];
@@ -172,7 +211,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
             }
 
             if constexpr (dim > 2) {
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     p_vec_L[c] = prim(c, k - 1, j, i);
                     p_vec_R[c] = prim(c, k + 1, j, i);
                 }
@@ -192,7 +231,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                 p_vec_L = p_vec;
                 p_vec_R = p_vec;
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     const double eig = Eigs.z.lambda(c);
                     if (eig >= 0.0) {
                         p_vec_R += 0.5 * (1.0 - eig * dtz) * d_w[c] * col(Eigs.z.right, c);
@@ -201,7 +240,7 @@ AETHER_INLINE void PLM_sweep(Sim& sim) noexcept {
                     }
                 }
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fzR(c, q, k,   j, i) = p_vec_L[c];
                         view.fzL(c, q, k+1, j, i) = p_vec_R[c];
@@ -233,7 +272,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
             double dty = dty_p;
             double dtz = dtz_p;
 
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 p_vec[c] = prim(c, k, j, i);
             }
 
@@ -249,7 +288,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
             vec a0L, a0R;
 
             // x-sweep
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 p_vec_L[c]  = prim(c, k, j, i - 1);
                 p_vec_L2[c] = prim(c, k, j, i - 2);
                 p_vec_R[c]  = prim(c, k, j, i + 1);
@@ -294,7 +333,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
             p_vec_L = (a0R - a0L);
             p_vec_R = (a0R + a0L);
 
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 if (d_w_ir[c] * d_w_il[c] <= 0.0) {
                     a0L[c] = p_vec[c];
                     a0R[c] = p_vec[c];
@@ -315,7 +354,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
             p_vec_L = C0;
             p_vec_R = C0;
 
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 const double eig = Eigs.x.lambda(c);
                 if (eig >= 0.0) {
                     p_vec_R += 0.5 * (1.0 - eig * dtx) * col(Eigs.x.right, c) * delta_c1[c]
@@ -328,7 +367,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                 }
             }
 
-            for (int c = 0; c < numvar; ++c) {
+            for (int c = 0; c < numvar-1; ++c) {
                 for (int q = 0; q < view.quad; ++q) {
                     view.fxR(c, q, k, j, i)   = p_vec_L[c];
                     view.fxL(c, q, k, j, i+1) = p_vec_R[c];
@@ -337,7 +376,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
 
             // y-sweep
             if constexpr (dim > 1) {
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     p_vec_L[c]  = prim(c, k, j - 1, i);
                     p_vec_L2[c] = prim(c, k, j - 2, i);
                     p_vec_R[c]  = prim(c, k, j + 1, i);
@@ -382,7 +421,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                 p_vec_L = (a0R - a0L);
                 p_vec_R = (a0R + a0L);
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     if (d_w_ir[c] * d_w_il[c] <= 0.0) {
                         a0L[c] = p_vec[c];
                         a0R[c] = p_vec[c];
@@ -403,7 +442,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                 p_vec_L = C0;
                 p_vec_R = C0;
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     const double eig = Eigs.y.lambda(c);
                     if (eig >= 0.0) {
                         p_vec_R += 0.5 * (1.0 - eig * dty) * col(Eigs.y.right, c) * delta_c1[c]
@@ -416,7 +455,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                     }
                 }
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fyR(c, q, k, j,   i) = p_vec_L[c];
                         view.fyL(c, q, k, j+1, i) = p_vec_R[c];
@@ -426,7 +465,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
 
             // z-sweep
             if constexpr (dim > 2) {
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     p_vec_L[c]  = prim(c, k - 1, j, i);
                     p_vec_L2[c] = prim(c, k - 2, j, i);
                     p_vec_R[c]  = prim(c, k + 1, j, i);
@@ -471,7 +510,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                 p_vec_L = (a0R - a0L);
                 p_vec_R = (a0R + a0L);
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     if (d_w_ir[c] * d_w_il[c] <= 0.0) {
                         a0L[c] = p_vec[c];
                         a0R[c] = p_vec[c];
@@ -492,7 +531,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                 p_vec_L = C0;
                 p_vec_R = C0;
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     const double eig = Eigs.z.lambda(c);
                     if (eig >= 0.0) {
                         p_vec_R += 0.5 * (1.0 - eig * dtz) * col(Eigs.z.right, c) * delta_c1[c]
@@ -505,7 +544,7 @@ AETHER_INLINE void PPM_sweep(Sim& sim) noexcept {
                     }
                 }
 
-                for (int c = 0; c < numvar; ++c) {
+                for (int c = 0; c < numvar-1; ++c) {
                     for (int q = 0; q < view.quad; ++q) {
                         view.fzR(c, q, k,   j, i) = p_vec_L[c];
                         view.fzL(c, q, k+1, j, i) = p_vec_R[c];

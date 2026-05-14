@@ -44,14 +44,12 @@ static void flux_sweep(CellViewT out, FaceViewT FW, Sim& sim) {
                 const double FL = FW(c, 0, k, j, i);
 
                 if constexpr (dir == sweep_dir::x) {
-                    out_p(c, k, j, i) = -dtdx * (FL - FR + (P::EINT==c) * pbar * (SL-SR) );
+                    out_p(c, k, j, i) = -dtdx * (FL - FR + (c == P::EINT)*pbar*(SL-SR) ) ;
 
                 } else {
                     out_p(c, k, j, i) += -dtdx * (FL - FR + (P::EINT==c) * pbar*(SL-SR));
                 }
             }
-
-
         }
     );
 }
