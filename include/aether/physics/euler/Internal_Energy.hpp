@@ -4,8 +4,8 @@
 #include <aether/core/config.hpp>
 #include <aether/core/Kokkos_loopBounds.hpp>
 
-#define FORCE_ENERGY_CORRECT false
-#define NEVER_ENERGY_CORRECT true
+#define FORCE_ENERGY_CORRECT true
+#define NEVER_ENERGY_CORRECT false
 
 
 namespace loop = aether::loops;
@@ -37,7 +37,7 @@ void Update_internal_energy(CellView cons, Sim& sim){
             cons(C::E,k,j,i) = cons(P::EINT,k,j,i) + rho*kin_e;
         }
         else{
-            // cons(P::EINT,k,j,i) = cons(C::E,k,j,i) - kin_e*rho;
+            cons(P::EINT,k,j,i) = cons(C::E,k,j,i) - kin_e*rho;
         }
     }
     );
